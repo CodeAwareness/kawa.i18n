@@ -1,0 +1,39 @@
+{
+  "id": "i18n",
+  "name": "Internationalization",
+  "version": "1.1.0",
+  "description": "Code translation extension for multilingual development",
+  "author": "Kawa Code",
+  "license": "MIT",
+  "binary": {
+    "path": "./binaries/i18n-service-macos",
+    "devPath": "./dev.sh",
+    "devMode": "spawn"
+  },
+  "domains": {
+    "subscribe": ["i18n", "auth", "intent"]
+  },
+  "ui": {
+    "webComponent": {
+      "enabled": true,
+      "path": "./ui/dist/i18n-ui.js",
+      "devPath": "./ui/dist/i18n-ui.js",
+      "panels": [],
+      "screens": [
+        {
+          "id": "code-viewer",
+          "title": "Translated Code",
+          "menuPath": "Tools",
+          "route": "/extensions/i18n/code-viewer",
+          "icon": "pi pi-language"
+        }
+      ]
+    },
+    "settings": {
+      "enabled": true,
+      "title": "Code Translation",
+      "icon": "pi pi-language",
+      "webComponent": "i18n-settings"
+    }
+  }
+}

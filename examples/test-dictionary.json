@@ -1,0 +1,22 @@
+{
+  "origin": "https://github.com/example/demo.git",
+  "language": "ja",
+  "terms": {
+    "Calculator": "計算機",
+    "result": "結果",
+    "add": "追加",
+    "subtract": "減算",
+    "multiply": "乗算",
+    "divide": "除算",
+    "value": "値",
+    "getResult": "結果取得",
+    "reset": "リセット",
+    "calc": "計算",
+    "finalResult": "最終結果"
+  },
+  "metadata": {
+    "createdAt": "2024-12-06T10:00:00Z",
+    "updatedAt": "2024-12-06T10:00:00Z",
+    "version": "1.0.0"
+  }
+}

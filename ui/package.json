@@ -1,0 +1,20 @@
+{
+  "name": "@kawa/i18n-ui",
+  "version": "1.0.0",
+  "description": "Translated Code Viewer UI for Kawa i18n Extension",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3.1.0",
+    "prismjs": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/prismjs": "^1.26.3",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}
