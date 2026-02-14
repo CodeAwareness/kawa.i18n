@@ -9,7 +9,8 @@
 
 import { createHash } from 'crypto';
 import { registerHandler, startListening, addResponseInterceptor, setRequestStream } from './ipc/handlers';
-import { log, sendProgress, sendBroadcast, setResponseStream } from './ipc/protocol';
+import { log, sendProgress, sendBroadcast, setResponseStream, setTransport } from './ipc/protocol';
+import { connectToMuninn, getDefaultMuninnSocketPath } from './ipc/muninn-socket';
 import { CircularStreamBuffer } from './ipc/stream-buffer';
 import {
   startDirectServer,
@@ -1839,28 +1840,61 @@ async function main() {
   // Register extension:ready handler to know when Muninn is ready
   registerHandler('extension', 'ready', handleExtensionReady);
 
-  // Start listening on stdin for Muninn messages
-  startListening();
+  // Determine transport mode: socket or stdin/stdout
+  const muninnSocketArg = process.argv.find(a => a.startsWith('--muninn-socket'));
+  const muninnSocketPath = process.env.MUNINN_SOCKET
+    || (muninnSocketArg ? muninnSocketArg.split('=')[1] : undefined);
 
-  // Initialize stream buffers for large message support
-  {
-    const os = await import('os');
-    const path = await import('path');
-    const fs = await import('fs');
-    const STREAMS_DIR = path.join(os.homedir(), '.kawa-code', 'streams', 'i18n');
+  if (muninnSocketPath) {
+    // Socket mode: connect to Muninn as extension client
+    log(`Connecting to Muninn socket at: ${muninnSocketPath}`);
     try {
-      const reqPath = path.join(STREAMS_DIR, 'request.stream');
-      const resPath = path.join(STREAMS_DIR, 'response.stream');
-      if (fs.existsSync(reqPath)) {
-        setRequestStream(new CircularStreamBuffer(reqPath));
-        log('Request stream initialized');
-      }
-      if (fs.existsSync(resPath)) {
-        setResponseStream(new CircularStreamBuffer(resPath));
-        log('Response stream initialized');
-      }
+      const transport = await connectToMuninn(muninnSocketPath);
+      setTransport(transport.writable, 'socket');
+      startListening(transport.readable);
+      log('Running in socket mode (Muninn IPC client)');
     } catch (err: any) {
-      log(`Stream init failed: ${err.message} (falling back to STDOUT-only)`);
+      log(`[Fatal] Failed to connect to Muninn socket: ${err.message}`);
+      process.exit(1);
+    }
+  } else if (!process.stdin.isTTY) {
+    // Legacy stdin/stdout mode (spawned by Muninn)
+    startListening();
+    log('Running in stdin/stdout mode (spawned by Muninn)');
+
+    // Initialize stream buffers for large message support (stdin mode only)
+    {
+      const os = await import('os');
+      const path = await import('path');
+      const fs = await import('fs');
+      const STREAMS_DIR = path.join(os.homedir(), '.kawa-code', 'streams', 'i18n');
+      try {
+        const reqPath = path.join(STREAMS_DIR, 'request.stream');
+        const resPath = path.join(STREAMS_DIR, 'response.stream');
+        if (fs.existsSync(reqPath)) {
+          setRequestStream(new CircularStreamBuffer(reqPath));
+          log('Request stream initialized');
+        }
+        if (fs.existsSync(resPath)) {
+          setResponseStream(new CircularStreamBuffer(resPath));
+          log('Response stream initialized');
+        }
+      } catch (err: any) {
+        log(`Stream init failed: ${err.message} (falling back to STDOUT-only)`);
+      }
+    }
+  } else {
+    // Interactive TTY mode: try connecting to Muninn socket at default path
+    const defaultPath = getDefaultMuninnSocketPath();
+    log(`No MUNINN_SOCKET env or stdin pipe. Trying default socket: ${defaultPath}`);
+    try {
+      const transport = await connectToMuninn(defaultPath);
+      setTransport(transport.writable, 'socket');
+      startListening(transport.readable);
+      log('Running in socket mode (auto-detected default path)');
+    } catch (err: any) {
+      log(`[Fatal] Cannot start: no stdin pipe and no Muninn socket at ${defaultPath}: ${err.message}`);
+      process.exit(1);
     }
   }
 
@@ -1888,7 +1922,8 @@ async function main() {
     log('Huginn clients will use Muninn routing as fallback');
   }
 
-  log('i18n extension ready (Muninn stdin + Direct IPC)');
+  const mode = muninnSocketPath || process.stdin.isTTY ? 'socket' : 'stdin';
+  log(`i18n extension ready (Muninn ${mode} + Direct IPC)`);
 }
 
 // Handle uncaught errors

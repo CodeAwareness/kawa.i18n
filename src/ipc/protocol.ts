@@ -12,6 +12,7 @@
  * }
  */
 
+import { Writable } from 'stream';
 import { CircularStreamBuffer, STREAM_THRESHOLD_BYTES } from './stream-buffer';
 
 export interface IPCMessage {
@@ -21,6 +22,41 @@ export interface IPCMessage {
   caw: string;
   data: any;
   _msgId?: string;
+}
+
+/**
+ * Transport mode for output messages.
+ *
+ * - 'stdio': Messages are prefixed with "MUNINN START:0 " (legacy stdin/stdout mode)
+ * - 'socket': Plain JSON lines over Muninn socket (no prefix)
+ */
+let transportMode: 'stdio' | 'socket' = 'stdio';
+
+/**
+ * Output stream for sending messages (defaults to process.stdout)
+ */
+let outputStream: Writable = process.stdout;
+
+/**
+ * Set the output transport for all protocol messages.
+ * In socket mode, messages are sent as plain JSON lines (no MUNINN START prefix).
+ */
+export function setTransport(stream: Writable, mode: 'stdio' | 'socket' = 'socket'): void {
+  outputStream = stream;
+  transportMode = mode;
+}
+
+/**
+ * Write a message to the output transport.
+ * In stdio mode, prefixes with "MUNINN START:0 ".
+ * In socket mode, writes plain JSON line.
+ */
+function writeMessage(serialized: string): void {
+  if (transportMode === 'stdio') {
+    outputStream.write(`MUNINN START:0 ${serialized}\n`);
+  } else {
+    outputStream.write(`${serialized}\n`);
+  }
 }
 
 /**
@@ -54,7 +90,7 @@ export function sendResponse(request: IPCMessage, data: any): void {
   if (byteLength >= STREAM_THRESHOLD_BYTES && responseStream) {
     try {
       responseStream.write(response);
-      // Send a lightweight notification via STDOUT so Muninn knows to read from stream
+      // Send a lightweight notification so Muninn knows to read from stream
       const notification = JSON.stringify({
         flow: 'res',
         domain: request.domain,
@@ -63,14 +99,14 @@ export function sendResponse(request: IPCMessage, data: any): void {
         _msgId: request._msgId,
         _streamResponse: true,
       });
-      process.stdout.write(`MUNINN START:0 ${notification}\n`);
+      writeMessage(notification);
       log(`Large response via stream (${byteLength} bytes) for ${request.domain}:${request.action}`);
     } catch (err: any) {
-      log(`Stream write failed (${err.message}), falling back to STDOUT`);
-      process.stdout.write(`MUNINN START:0 ${serialized}\n`);
+      log(`Stream write failed (${err.message}), falling back to direct write`);
+      writeMessage(serialized);
     }
   } else {
-    process.stdout.write(`MUNINN START:0 ${serialized}\n`);
+    writeMessage(serialized);
   }
 }
 
@@ -91,7 +127,7 @@ export function sendError(request: IPCMessage, error: Error | string): void {
     _msgId: request._msgId,
   };
 
-  process.stdout.write(`MUNINN START:0 ${JSON.stringify(response)}\n`);
+  writeMessage(JSON.stringify(response));
 }
 
 /**
@@ -106,7 +142,7 @@ export function sendBroadcast(domain: string, action: string, data: any): void {
     data,
   };
 
-  process.stdout.write(`MUNINN START:0 ${JSON.stringify(broadcast)}\n`);
+  writeMessage(JSON.stringify(broadcast));
 }
 
 /**
@@ -142,7 +178,7 @@ export function sendProgress(
     },
   };
 
-  process.stdout.write(`MUNINN START:0 ${JSON.stringify(message)}\n`);
+  writeMessage(JSON.stringify(message));
 }
 
 import * as fs from 'fs';

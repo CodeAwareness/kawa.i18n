@@ -15,8 +15,11 @@ import * as os from 'os';
 import { log, IPCMessage } from './protocol';
 
 const isWindows = os.platform() === 'win32';
+const isMacOS = os.platform() === 'darwin';
 const SOCKET_NAME = 'kawa.i18n';
-const SOCKET_DIR = path.join(os.homedir(), '.kawa-code', 'sockets');
+const SOCKET_DIR = isMacOS
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'Kawa Code', 'sockets')
+  : path.join(os.homedir(), '.kawa-code', 'sockets');
 const SOCKET_PATH = isWindows
   ? `\\\\.\\pipe\\${SOCKET_NAME}`
   : path.join(SOCKET_DIR, SOCKET_NAME);
