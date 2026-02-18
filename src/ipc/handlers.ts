@@ -1,4 +1,5 @@
 import * as readline from 'readline';
+import { Readable } from 'stream';
 import { IPCMessage, sendResponse, sendError, log } from './protocol';
 import { CircularStreamBuffer } from './stream-buffer';
 
@@ -96,12 +97,15 @@ async function dispatchMessage(message: IPCMessage): Promise<void> {
 }
 
 /**
- * Start listening for IPC messages on stdin
+ * Start listening for IPC messages.
+ *
+ * @param inputStream - Optional readable stream to listen on (defaults to process.stdin).
+ *                      In socket mode, pass the Muninn socket's readable stream.
  */
-export function startListening(): void {
+export function startListening(inputStream?: Readable): void {
+  const input = inputStream || process.stdin;
   const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+    input,
     terminal: false,
   });
 
@@ -148,9 +152,9 @@ export function startListening(): void {
   });
 
   rl.on('close', () => {
-    log('STDIN closed, exiting');
+    log('Input stream closed, exiting');
     process.exit(0);
   });
 
-  log('IPC listener started on STDIN');
+  log(`IPC listener started on ${inputStream ? 'Muninn socket' : 'STDIN'}`);
 }
