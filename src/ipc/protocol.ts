@@ -145,6 +145,16 @@ export function sendProgress(
   process.stdout.write(`MUNINN START:0 ${JSON.stringify(message)}\n`);
 }
 
+/**
+ * Flush stdout so the last progress message (e.g. complete) is delivered to Muninn
+ * before the handler returns. Call after sendProgress(..., 'complete', ...).
+ */
+export function flushProgressToMuninn(): Promise<void> {
+  return new Promise((resolve) => {
+    process.stdout.write('', () => resolve());
+  });
+}
+
 import * as fs from 'fs';
 import * as path from 'path';
 

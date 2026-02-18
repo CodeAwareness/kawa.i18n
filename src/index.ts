@@ -9,7 +9,7 @@
 
 import { createHash } from 'crypto';
 import { registerHandler, startListening, addResponseInterceptor, setRequestStream } from './ipc/handlers';
-import { log, sendProgress, sendBroadcast, setResponseStream } from './ipc/protocol';
+import { log, sendProgress, sendBroadcast, setResponseStream, flushProgressToMuninn } from './ipc/protocol';
 import { CircularStreamBuffer } from './ipc/stream-buffer';
 import {
   startDirectServer,
@@ -1014,7 +1014,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
     // Clear translation cache so stale results aren't served
     translationCache.clear();
 
-    // Send completion
+    // Send completion so the progress bar dismisses in Muninn
     const completionDetail = allMarkdownTexts.length > 0
       ? `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} text blocks (comments + markdown).`
       : `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments.`;
@@ -1025,6 +1025,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       autoClose: true,
       autoCloseDelay: 3000,
     });
+    await flushProgressToMuninn();
 
     // Show success notification
     sendBroadcast('muninn', 'notification', {
@@ -1043,7 +1044,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
   } catch (error: any) {
     log(`Scan project error: ${error.message}`);
 
-    // Send progress error
+    // Send progress error so the bar is dismissed or shows error state
     sendProgress(taskId, 'Project Scan', 'error', {
       status: 'error',
       error: error.message || 'Project scan failed',
