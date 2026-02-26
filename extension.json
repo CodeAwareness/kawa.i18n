@@ -6,7 +6,7 @@
   "author": "Kawa Code",
   "license": "MIT",
   "binary": {
-    "path": "./binaries/i18n-service-macos",
+    "path": "./binaries/i18n-service",
     "devPath": "./dev.sh",
     "devMode": "spawn"
   },

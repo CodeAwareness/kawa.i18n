@@ -75,6 +75,25 @@ kawa.i18n/
 
 ## Installation
 
+### Prerequisites: Claude CLI (for new translations)
+
+The extension uses the **Claude CLI** for LLM-powered translation (e.g. project scan, new terms). The extension does not use its own API key; it runs the `claude` command, which must be installed and authenticated on your machine.
+
+1. **Install the Claude CLI** (must be on your PATH):
+   - **Windows (PowerShell):** `irm https://claude.ai/install.ps1 | iex`
+   - **Windows (WinGet):** `winget install Anthropic.ClaudeCode`
+   - **macOS/Linux:** see [Claude Code setup](https://docs.anthropic.com/en/docs/claude-code/setup).
+
+2. **Authenticate** (choose one):
+   - **Claude Pro/Max:** run `claude auth login` and sign in with your Claude.ai account.
+   - **API key:** get a key from [Anthropic Console → API Keys](https://console.anthropic.com/settings/keys), then set it so the `claude` process can see it (e.g. in PowerShell: `$env:ANTHROPIC_API_KEY = "your-api-key"`, or add it to your system environment variables).
+
+3. **Verify:** in a terminal run `claude --version`. If that succeeds and the CLI is authenticated, the i18n extension can use it for translation.
+
+If the Claude CLI is not installed or not authenticated, existing dictionary lookups still work; only **new** translations (e.g. first project scan) will fail until the CLI is set up.
+
+### Build the extension
+
 ```bash
 # Install dependencies
 npm install
@@ -274,6 +293,26 @@ Dictionaries are stored in `~/.kawa-code/i18n/dictionaries/` as JSON files:
 ```
 
 Translation scope settings are stored separately in `~/.kawa-code/i18n/settings.json`.
+
+## Linking the extension for development (Windows)
+
+Kawa Code (Muninn) loads extensions from `%USERPROFILE%\.kawa-code\extensions\`. To have it use **this repo** so your local changes and builds are used without copying files:
+
+1. **Run the link script** from the kawa.i18n repo root (no admin required):
+
+   ```powershell
+   .\link-extension-i18n.ps1
+   ```
+
+   This creates a **directory junction** `%USERPROFILE%\.kawa-code\extensions\kawa.i18n` → this repo. If a non-linked `kawa.i18n` folder already exists there, it is renamed to `kawa.i18n.bak` first.
+
+2. **Optional:** Point the junction at a different clone of kawa.i18n:
+
+   ```powershell
+   .\link-extension-i18n.ps1 -Target "D:\path\to\kawa.i18n"
+   ```
+
+After linking, restart Kawa Code (Muninn); it will load the i18n extension from this repo. Build with `npm run build` (and optionally `npm run build:windows` for the native binary) so Muninn finds the latest binaries.
 
 ## Development
 

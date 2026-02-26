@@ -779,6 +779,11 @@ export class I18nCodeViewer extends LitElement {
     }
   }
 
+  /** Normalize path separators to forward slash (so Windows paths build a proper tree) */
+  private normalizePath(p: string): string {
+    return p.replace(/\\/g, '/')
+  }
+
   /**
    * Build a tree structure from flat file paths
    */
@@ -788,8 +793,8 @@ export class I18nCodeViewer extends LitElement {
 
     // Sort files so directories come before files at the same level
     const sortedFiles = [...files].sort((a, b) => {
-      const aParts = a.split('/')
-      const bParts = b.split('/')
+      const aParts = this.normalizePath(a).split('/')
+      const bParts = this.normalizePath(b).split('/')
 
       // Compare path parts
       for (let i = 0; i < Math.min(aParts.length, bParts.length); i++) {
@@ -801,7 +806,7 @@ export class I18nCodeViewer extends LitElement {
     })
 
     for (const filePath of sortedFiles) {
-      const parts = filePath.split('/')
+      const parts = this.normalizePath(filePath).split('/')
       let currentPath = ''
 
       for (let i = 0; i < parts.length; i++) {
@@ -924,13 +929,15 @@ export class I18nCodeViewer extends LitElement {
    */
   private toRelativePath(absolutePath: string): string | null {
     if (!this.loadedProjectRoot) return null
-    const root = this.loadedProjectRoot.endsWith('/') ? this.loadedProjectRoot : this.loadedProjectRoot + '/'
-    if (absolutePath.startsWith(root)) {
-      return absolutePath.slice(root.length)
+    const normRoot = this.normalizePath(this.loadedProjectRoot)
+    const root = normRoot.endsWith('/') ? normRoot : normRoot + '/'
+    const normPath = this.normalizePath(absolutePath)
+    if (normPath.startsWith(root)) {
+      return normPath.slice(root.length)
     }
     // Already a relative path - check if it exists in the tree
-    if (this.findNodeByPath(this.fileTree, absolutePath)) {
-      return absolutePath
+    if (this.findNodeByPath(this.fileTree, normPath)) {
+      return normPath
     }
     return null
   }
@@ -939,10 +946,11 @@ export class I18nCodeViewer extends LitElement {
    * Find a file tree node by path
    */
   private findNodeByPath(nodes: FileTreeNode[], path: string): FileTreeNode | null {
+    const normPath = this.normalizePath(path)
     for (const node of nodes) {
-      if (node.path === path) return node
+      if (node.path === normPath) return node
       if (node.children.length > 0) {
-        const found = this.findNodeByPath(node.children, path)
+        const found = this.findNodeByPath(node.children, normPath)
         if (found) return found
       }
     }
@@ -953,7 +961,7 @@ export class I18nCodeViewer extends LitElement {
    * Expand all parent directories in the sidebar so the given file path is visible
    */
   private expandPathToFile(filePath: string) {
-    const parts = filePath.split('/')
+    const parts = this.normalizePath(filePath).split('/')
     if (parts.length <= 1) return
 
     const newExpanded = new Set(this.expandedPaths)

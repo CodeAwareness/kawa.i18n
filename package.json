@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "dev:watch": "tsx watch src/index.ts",
-    "build": "tsc && cd ui; yarn build",
-    "build:macos": "npm run build && pkg dist/index.js -t node18-macos-x64 -o binaries/i18n-service-macos",
-    "build:windows": "npm run build && pkg dist/index.js -t node18-win-x64 -o binaries/i18n-service-windows.exe",
-    "build:linux": "npm run build && pkg dist/index.js -t node18-linux-x64 -o binaries/i18n-service-linux",
+    "build": "tsc && cd ui && yarn build",
+    "build:macos": "npm run build && pkg dist/index.js -t node18-macos-x64 -o binaries/i18n-service",
+    "build:windows": "npm run build && pkg dist/index.js -t node18-win-x64 -o binaries/i18n-service.exe",
+    "build:linux": "npm run build && pkg dist/index.js -t node18-linux-x64 -o binaries/i18n-service",
     "test": "jest",
     "test:unit": "jest --testPathPattern=__tests__",
     "test:watch": "jest --watch",
@@ -19,7 +19,8 @@
     "test:manual": "tsx examples/manual-test.ts",
     "test:all": "npm run test && npm run test:roundtrip && npm run test:comprehensive",
     "example": "tsx examples/basic.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "postinstall": "cd ui && yarn install"
   },
   "keywords": [
     "kawa",
