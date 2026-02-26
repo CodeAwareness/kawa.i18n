@@ -28,12 +28,8 @@ import { CommentExtractor } from './core/commentExtractor';
 import { MarkdownExtractor } from './core/markdownExtractor';
 import { IPCMessage } from './ipc/protocol';
 import { LanguageCode, TranslationScope } from './core/types';
-import {
-  translateIdentifiers as localTranslateIdentifiers,
-  translateComments as localTranslateComments,
-  translateProject as localTranslateProject,
-} from './claude';
 import type { TranslationProgressCallback } from './claude';
+import { getTranslationBackend, resetTranslationBackend } from './translation';
 import { setAuthState } from './auth/store';
 import {
   handleGetIntentsForFile,
@@ -46,7 +42,8 @@ import {
   handleGetBlockContentTranslated,
   handleDirectGetBlockContentTranslated,
 } from './intent/handlers';
-import { getTranslationScope, setTranslationScope } from './config/settings';
+import { getTranslationScope, setTranslationScope, getTranslationMode, setTranslationMode } from './config/settings';
+import type { TranslationMode } from './config/settings';
 
 const EXTENSION_ID = 'i18n';
 const VERSION = '1.0.0';
@@ -368,11 +365,11 @@ async function translateNewTerms(
     // Determine which language dictionary to update
     const dictLang = sourceLang === 'en' ? targetLang : sourceLang;
 
-    // Use local translation via Claude CLI
-    const translations = await localTranslateIdentifiers(terms, sourceLang, targetLang);
+    const backend = getTranslationBackend();
+    const translations = await backend.translateIdentifiers(terms, sourceLang, targetLang);
 
     const translatedCount = Object.keys(translations).length;
-    log(`Successfully translated ${translatedCount} new terms locally`);
+    log(`Successfully translated ${translatedCount} new terms via ${backend.name} backend`);
 
     // Dictionary stores { englishTerm: foreignTerm }
     // When source is non-English (e.g., JA), we need to flip:
@@ -415,9 +412,10 @@ async function translateNewComments(
   _filePath: string
 ): Promise<void> {
   try {
-    const translations = await localTranslateComments(comments, sourceLang, targetLang);
+    const backend = getTranslationBackend();
+    const translations = await backend.translateComments(comments, sourceLang, targetLang);
     const translatedCount = Object.keys(translations).length;
-    log(`Successfully translated ${translatedCount} new comments locally`);
+    log(`Successfully translated ${translatedCount} new comments via ${backend.name} backend`);
 
     // Store translated comments in dictionary
     // Dictionary stores comments as { hash: { en: string, [lang]: string } }
@@ -462,7 +460,8 @@ async function translateProjectInBackground(taskId: string, origin: string, targ
       }
     };
 
-    const translateResult = await localTranslateProject(
+    const backend = getTranslationBackend();
+    const translateResult = await backend.translateProject(
       identifierNames,
       comments,
       'en', // Source is always English for project scan
@@ -470,7 +469,7 @@ async function translateProjectInBackground(taskId: string, origin: string, targ
       onTranslationProgress
     );
 
-    log(`Local translation complete: ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments`);
+    log(`Translation complete (${backend.name}): ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments`);
 
     // Send progress update
     sendProgress(taskId, 'Project Translation', 'progress', {
@@ -983,7 +982,8 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       }
     };
 
-    const translateResult = await localTranslateProject(
+    const scanBackend = getTranslationBackend();
+    const translateResult = await scanBackend.translateProject(
       uniqueIdentifiers,
       allTextsToTranslate,
       'en', // Source is always English for project scan
@@ -991,7 +991,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       onScanProgress
     );
 
-    log(`Translation complete: ${translateResult.totalTerms} terms and ${translateResult.totalComments} text blocks`);
+    log(`Translation complete (${scanBackend.name}): ${translateResult.totalTerms} terms and ${translateResult.totalComments} text blocks`);
 
     // Save dictionary
     sendProgress(taskId, 'Project Scan', 'progress', {
@@ -1111,7 +1111,8 @@ async function handleProceedTranslation(message: IPCMessage): Promise<any> {
       }
     };
 
-    const translateResult = await localTranslateProject(
+    const proceedBackend = getTranslationBackend();
+    const translateResult = await proceedBackend.translateProject(
       pending.identifiers,
       pending.comments,
       'en', // Source is always English for project scan
@@ -1119,7 +1120,7 @@ async function handleProceedTranslation(message: IPCMessage): Promise<any> {
       onProceedProgress
     );
 
-    log(`[ProceedTranslation] Translation complete: ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments`);
+    log(`[ProceedTranslation] Translation complete (${proceedBackend.name}): ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments`);
 
     // Save dictionary
     sendProgress(taskId, 'Project Translation', 'progress', {
@@ -1286,10 +1287,10 @@ async function handleFileSaved(message: IPCMessage): Promise<any> {
       });
 
       try {
-        // Use local translation via Claude CLI
-        const translations = await localTranslateIdentifiers(newTermsToTranslate, sourceLang, targetLang);
+        const fileSaveBackend = getTranslationBackend();
+        const translations = await fileSaveBackend.translateIdentifiers(newTermsToTranslate, sourceLang, targetLang);
 
-        log(`[FileSave] Successfully translated ${Object.keys(translations).length} new terms locally`);
+        log(`[FileSave] Successfully translated ${Object.keys(translations).length} new terms via ${fileSaveBackend.name} backend`);
 
         // Add translated terms to dictionary
         // Local translation returns { sourceTerm: translatedTerm } mapping
@@ -1483,7 +1484,8 @@ async function handleHeadChanged(message: IPCMessage): Promise<void> {
 async function handleGetSettings(message: IPCMessage): Promise<any> {
   log('[i18n] Getting settings');
   const translationScope = getTranslationScope();
-  return { translationScope };
+  const translationMode = getTranslationMode();
+  return { translationScope, translationMode };
 }
 
 /**
@@ -1515,6 +1517,30 @@ async function handleSetSettings(message: IPCMessage): Promise<any> {
   translationCache.clear();
 
   return { success: true, translationScope: validScope };
+}
+
+/**
+ * Handle get-translation-mode request
+ */
+async function handleGetTranslationMode(message: IPCMessage): Promise<any> {
+  return { translationMode: getTranslationMode() };
+}
+
+/**
+ * Handle set-translation-mode request
+ */
+async function handleSetTranslationMode(message: IPCMessage): Promise<any> {
+  const { translationMode } = message.data;
+
+  if (translationMode !== 'local' && translationMode !== 'api') {
+    return { success: false, error: 'translationMode must be "local" or "api"' };
+  }
+
+  log(`[i18n] Setting translation mode: ${translationMode}`);
+  setTranslationMode(translationMode as TranslationMode);
+  resetTranslationBackend();
+
+  return { success: true, translationMode };
 }
 
 /**
@@ -1813,6 +1839,8 @@ async function main() {
   // Settings handlers
   registerHandler('i18n', 'get-settings', handleGetSettings);
   registerHandler('i18n', 'set-settings', handleSetSettings);
+  registerHandler('i18n', 'get-translation-mode', handleGetTranslationMode);
+  registerHandler('i18n', 'set-translation-mode', handleSetTranslationMode);
 
   // TEMPORARY: Register test handler
   registerHandler('i18n', 'test-progress', handleTestProgress);

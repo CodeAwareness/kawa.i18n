@@ -132,8 +132,11 @@ export function reloadConfig(): void {
 const I18N_SETTINGS_DIR = path.join(os.homedir(), '.kawa-code', 'i18n');
 const I18N_SETTINGS_PATH = path.join(I18N_SETTINGS_DIR, 'settings.json');
 
+export type TranslationMode = 'local' | 'api';
+
 interface I18nUserSettings {
   translationScope?: TranslationScope;
+  translationMode?: TranslationMode;
 }
 
 /**
@@ -188,5 +191,23 @@ export function getTranslationScope(): TranslationScope {
 export function setTranslationScope(scope: TranslationScope): void {
   const settings = loadI18nUserSettings();
   settings.translationScope = scope;
+  saveI18nUserSettings(settings);
+}
+
+/**
+ * Get current translation mode ('local' or 'api')
+ * Default: 'local' (uses Claude CLI on user's machine)
+ */
+export function getTranslationMode(): TranslationMode {
+  const settings = loadI18nUserSettings();
+  return settings.translationMode ?? 'local';
+}
+
+/**
+ * Set translation mode
+ */
+export function setTranslationMode(mode: TranslationMode): void {
+  const settings = loadI18nUserSettings();
+  settings.translationMode = mode;
   saveI18nUserSettings(settings);
 }

@@ -90,28 +90,23 @@ export interface MuninnTransport {
  * so third-party extensions work without special entitlements.
  */
 export function getDefaultMuninnSocketPath(): string {
-  if (process.platform === 'darwin') {
-    // App Store (sandboxed) Muninn: socket is inside the sandbox container.
-    // The container directory exists once Muninn has run at least once.
-    const containerSocketDir = path.join(
-      os.homedir(),
-      'Library', 'Containers', MUNINN_BUNDLE_ID, 'Data',
-      'Library', 'Application Support', 'Kawa Code', 'sockets'
-    );
-    if (fs.existsSync(containerSocketDir)) {
-      log(`[MuninnSocket] Found sandbox container at ${containerSocketDir}`);
-      return path.join(containerSocketDir, 'muninn');
-    }
-
-    // Development (non-sandboxed) Muninn: socket at the normal path
-    return path.join(
-      os.homedir(),
-      'Library', 'Application Support', 'Kawa Code', 'sockets', 'muninn'
-    );
-  }
   if (process.platform === 'win32') {
     return '\\\\.\\pipe\\muninn';
   }
+  if (process.platform === 'darwin') {
+    // App Store (sandboxed) Muninn: socket may be inside the sandbox container
+    const containerSocketPath = path.join(
+      os.homedir(),
+      'Library', 'Containers', MUNINN_BUNDLE_ID, 'Data',
+      'Library', 'Application Support', 'Kawa Code', 'sockets', 'muninn'
+    );
+    if (fs.existsSync(containerSocketPath)) {
+      log(`[MuninnSocket] Found sandbox socket at ${containerSocketPath}`);
+      return containerSocketPath;
+    }
+  }
+  // All platforms (incl. macOS dev/brew): ~/.kawa-code/sockets/muninn
+  // Matches Muninn's paths.rs: sockets_dir().join("muninn")
   return path.join(os.homedir(), '.kawa-code', 'sockets', 'muninn');
 }
 

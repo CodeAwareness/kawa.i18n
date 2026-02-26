@@ -61,7 +61,7 @@ function getAuthToken(): string | null {
  * Make authenticated API request
  * Automatically prepends /v1/i18n to all endpoints
  */
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string,
   options: NodeRequestInit = {}
 ): Promise<APIResponse<T>> {
