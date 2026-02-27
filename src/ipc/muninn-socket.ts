@@ -120,16 +120,45 @@ export function getDefaultMuninnSocketPath(): string {
  */
 export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
   return new Promise((resolve, reject) => {
-    log(`[MuninnSocket] Connecting to Muninn at ${socketPath}...`);
+    log(`[MuninnSocket] Connecting to Muninn catalog at ${socketPath}...`);
 
     // Pre-load manifest and UI bundle before connecting
     const manifest = loadExtensionManifest();
     const uiBundle = loadUiBundle(manifest);
 
-    const socket = net.createConnection(socketPath, () => {
-      log(`[MuninnSocket] Connected to Muninn socket`);
+    // The readable stream for the extension to consume (replaces stdin)
+    const readable = new PassThrough();
 
-      // Build handshake data with manifest + UI bundle for self-registration
+    // activeSocket is reassigned on Windows after catalog→client pipe handoff.
+    // The writable listener writes to whichever socket is currently active.
+    let activeSocket: net.Socket | null = null;
+
+    // The writable stream for the extension to write to (replaces stdout)
+    // Messages written here go directly to Muninn via the active socket
+    const writable = new PassThrough();
+    writable.on('data', (chunk: Buffer) => {
+      if (!activeSocket) return;
+      const data = chunk.toString();
+      // Strip "MUNINN START:<caw> " prefix if present (legacy format)
+      const lines = data.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const stripped = line.replace(/^MUNINN START:\S+\s/, '');
+        activeSocket.write(stripped + '\n');
+      }
+    });
+
+    let handshakeReceived = false;
+    let switchedToClientPipe = false; // Windows: true after catalog→client pipe handoff
+    let buffer = '';
+
+    const catalogSocket = net.createConnection(socketPath, () => {
+      log(`[MuninnSocket] Connected to Muninn catalog socket`);
+
+      // Build handshake data with manifest + UI bundle for self-registration.
+      // On Windows the catalog pipe uses a 4KB read buffer so only send the
+      // small manifest here; the UI bundle is skipped (the Windows catalog
+      // handler does not process it and it would overflow the buffer).
       const handshakeData: Record<string, unknown> = {
         clientType: 'extension',
         extensionId: EXTENSION_ID,
@@ -152,31 +181,11 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
         data: handshakeData,
       });
 
-      socket.write(handshake + '\n');
+      catalogSocket.write(handshake + '\n');
       log(`[MuninnSocket] Sent extension handshake`);
     });
 
-    let handshakeReceived = false;
-    let buffer = '';
-
-    // The readable stream for the extension to consume (replaces stdin)
-    const readable = new PassThrough();
-
-    // The writable stream for the extension to write to (replaces stdout)
-    // Messages written here go directly to Muninn via the socket
-    const writable = new PassThrough();
-    writable.on('data', (chunk: Buffer) => {
-      const data = chunk.toString();
-      // Strip "MUNINN START:<caw> " prefix if present (legacy format)
-      const lines = data.split('\n');
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const stripped = line.replace(/^MUNINN START:\S+\s/, '');
-        socket.write(stripped + '\n');
-      }
-    });
-
-    socket.on('data', (data: Buffer) => {
+    catalogSocket.on('data', (data: Buffer) => {
       buffer += data.toString();
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
@@ -192,15 +201,28 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
               handshakeReceived = true;
               log(`[MuninnSocket] Handshake complete: caw=${msg.data?.caw}, extensionId=${msg.data?.extensionId}`);
 
-              const transport: MuninnTransport = {
-                readable,
-                writable,
-                close: () => {
-                  socket.destroy();
-                },
-              };
+              const pipePath: string | undefined = msg.data?.pipePath;
 
-              resolve(transport);
+              if (pipePath) {
+                // Windows two-pipe protocol: catalog pipe only handles registration.
+                // Connect to the dedicated client pipe for bidirectional I/O.
+                switchedToClientPipe = true;
+                log(`[MuninnSocket] Switching to client pipe: ${pipePath}`);
+                catalogSocket.destroy();
+                setTimeout(() => {
+                  connectClientPipe(pipePath, readable, writable, activeSocket, resolve, reject,
+                    (sock) => { activeSocket = sock; });
+                }, 50);
+              } else {
+                // Unix: single persistent connection
+                activeSocket = catalogSocket;
+                const transport: MuninnTransport = {
+                  readable,
+                  writable,
+                  close: () => { catalogSocket.destroy(); },
+                };
+                resolve(transport);
+              }
               continue;
             }
           } catch (e) {
@@ -213,24 +235,78 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
       }
     });
 
-    socket.on('error', (err: Error) => {
-      log(`[MuninnSocket] Socket error: ${err.message}`);
+    catalogSocket.on('error', (err: Error) => {
+      log(`[MuninnSocket] Catalog socket error: ${err.message}`);
       if (!handshakeReceived) {
         reject(new Error(`Failed to connect to Muninn: ${err.message}`));
       }
     });
 
-    socket.on('close', () => {
-      log(`[MuninnSocket] Socket closed`);
-      readable.push(null); // Signal EOF
+    catalogSocket.on('close', () => {
+      // On Windows the catalog pipe closes after handshake — expected, skip EOF.
+      // On Unix the catalog socket IS the transport, so closing means EOF.
+      if (!switchedToClientPipe) {
+        log(`[MuninnSocket] Socket closed`);
+        readable.push(null); // Signal EOF
+      }
     });
 
     // Timeout for handshake
     setTimeout(() => {
       if (!handshakeReceived) {
-        socket.destroy();
+        catalogSocket.destroy();
         reject(new Error('Muninn handshake timeout (10s)'));
       }
     }, 10000);
+  });
+}
+
+/**
+ * Connect to the dedicated client pipe returned in the Windows handshake.
+ * On Windows, Muninn creates a per-client named pipe (\\.\pipe\caw.<id>)
+ * for bidirectional communication after the catalog registration.
+ */
+function connectClientPipe(
+  pipePath: string,
+  readable: PassThrough,
+  writable: PassThrough,
+  _activeSocket: net.Socket | null,
+  resolve: (transport: MuninnTransport) => void,
+  reject: (err: Error) => void,
+  setActiveSocket: (sock: net.Socket) => void,
+): void {
+  log(`[MuninnSocket] Connecting to client pipe: ${pipePath}`);
+
+  let buffer = '';
+  const clientSocket = net.createConnection(pipePath, () => {
+    log(`[MuninnSocket] Client pipe connected`);
+    setActiveSocket(clientSocket);
+
+    const transport: MuninnTransport = {
+      readable,
+      writable,
+      close: () => { clientSocket.destroy(); },
+    };
+    resolve(transport);
+  });
+
+  clientSocket.on('data', (data: Buffer) => {
+    buffer += data.toString();
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      readable.push(line + '\n');
+    }
+  });
+
+  clientSocket.on('error', (err: Error) => {
+    log(`[MuninnSocket] Client pipe error: ${err.message}`);
+    reject(new Error(`Failed to connect to Muninn client pipe: ${err.message}`));
+  });
+
+  clientSocket.on('close', () => {
+    log(`[MuninnSocket] Client pipe closed`);
+    readable.push(null); // Signal EOF
   });
 }
