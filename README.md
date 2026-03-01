@@ -164,21 +164,21 @@ The extension communicates with Kawa Code via stdin/stdout using the Kawa IPC pr
 
 ### Available Actions (via Kawa Code stdin/stdout)
 
-| Action | Description |
-|--------|-------------|
-| `translate-code` | Translate a code file using the dictionary. Requires `translationScope`. |
-| `file-saved` | Translate foreign-language code back to English on save. |
-| `scan-project` | Scan a workspace for identifiers/comments and build a dictionary via Claude CLI. |
-| `proceed-translation` | Confirm and start translation for a large project (after scan shows stats). |
-| `load-dictionary` | Load or create a dictionary for a repository + language pair. |
-| `add-terms` | Add terms to an existing dictionary. |
-| `list-dictionaries` | List all cached dictionaries. |
-| `extract-identifiers` | Extract all identifiers from source code (without translating). |
-| `get-settings` | Get current translation scope settings. |
-| `set-settings` | Update translation scope settings. |
-| `normalize-intent` | Normalize an intent title for matching. |
-| `translate-intent-metadata` | Translate intent title/description to a target language. |
-| `detect-language` | Detect the language of a text string. |
+| Action                      | Description                                                                      |
+|-----------------------------|----------------------------------------------------------------------------------|
+| `translate-code`            | Translate a code file using the dictionary. Requires `translationScope`.         |
+| `file-saved`                | Translate foreign-language code back to English on save.                         |
+| `scan-project`              | Scan a workspace for identifiers/comments and build a dictionary via Claude CLI. |
+| `proceed-translation`       | Confirm and start translation for a large project (after scan shows stats).      |
+| `load-dictionary`           | Load or create a dictionary for a repository + language pair.                    |
+| `add-terms`                 | Add terms to an existing dictionary.                                             |
+| `list-dictionaries`         | List all cached dictionaries.                                                    |
+| `extract-identifiers`       | Extract all identifiers from source code (without translating).                  |
+| `get-settings`              | Get current translation scope settings.                                          |
+| `set-settings`              | Update translation scope settings.                                               |
+| `normalize-intent`          | Normalize an intent title for matching.                                          |
+| `translate-intent-metadata` | Translate intent title/description to a target language.                         |
+| `detect-language`           | Detect the language of a text string.                                            |
 
 #### Example: `translate-code`
 
@@ -221,25 +221,25 @@ The extension communicates with Kawa Code via stdin/stdout using the Kawa IPC pr
 
 Huginn editor extensions, such as the Kawa Code extensions in Visual Studio Code, can also connect directly to the i18n extension's Unix socket, bypassing Kawa Code. These handlers enrich messages with `origin` and language automatically:
 
-| Action | Description |
-|--------|-------------|
-| `i18n:translate-code` | Translate code (origin resolved from file path). |
-| `i18n:file-saved` | Translate back to English on save. |
-| `user:set-language` | Set the user's preferred language for a CAW. |
-| `user:get-language` | Get the current language for a CAW. |
-| `intent:get-for-file` | Get intents for a file (translated). |
-| `intent:get-for-lines` | Get intents for specific lines (translated). |
+| Action                 | Description                                      |
+|------------------------|--------------------------------------------------|
+| `i18n:translate-code`  | Translate code (origin resolved from file path). |
+| `i18n:file-saved`      | Translate back to English on save.               |
+| `user:set-language`    | Set the user's preferred language for a CAW.     |
+| `user:get-language`    | Get the current language for a CAW.              |
+| `intent:get-for-file`  | Get intents for a file (translated).             |
+| `intent:get-for-lines` | Get intents for specific lines (translated).     |
 
 ### Broadcast Handlers
 
 The extension also listens for broadcasts from Kawa Code:
 
-| Domain:Action | Description |
-|---------------|-------------|
-| `repo:active-path` | Syncs dictionary if remote version is newer. |
+| Domain:Action       | Description                                             |
+|---------------------|---------------------------------------------------------|
+| `repo:active-path`  | Syncs dictionary if remote version is newer.            |
 | `repo:head-changed` | Triggers project re-scan after git pull/checkout/merge. |
-| `auth:info` | Stores auth tokens for API calls. |
-| `extension:ready` | Initializes auth state on Kawa Code startup. |
+| `auth:info`         | Stores auth tokens for API calls.                       |
+| `extension:ready`   | Initializes auth state on Kawa Code startup.            |
 
 ### Progress Updates
 
@@ -294,30 +294,12 @@ Dictionaries are stored in `~/.kawa-code/i18n/dictionaries/` as JSON files:
 
 Translation scope settings are stored separately in `~/.kawa-code/i18n/settings.json`.
 
-## Linking the extension for development (Windows)
-
-Kawa Code (Muninn) loads extensions from `%USERPROFILE%\.kawa-code\extensions\`. To have it use **this repo** so your local changes and builds are used without copying files:
-
-1. **Run the link script** from the kawa.i18n repo root (no admin required):
-
-   ```powershell
-   .\link-extension-i18n.ps1
-   ```
-
-   This creates a **directory junction** `%USERPROFILE%\.kawa-code\extensions\kawa.i18n` → this repo. If a non-linked `kawa.i18n` folder already exists there, it is renamed to `kawa.i18n.bak` first.
-
-2. **Optional:** Point the junction at a different clone of kawa.i18n:
-
-   ```powershell
-   .\link-extension-i18n.ps1 -Target "D:\path\to\kawa.i18n"
-   ```
-
-After linking, restart Kawa Code (Muninn); it will load the i18n extension from this repo. Build with `npm run build` (and optionally `npm run build:windows` for the native binary) so Muninn finds the latest binaries.
-
 ## Development
 
+Run `npm run dev` (or `yarn dev`) from the repo root — the extension automatically connects to a running Muninn instance on startup. No symlinks or manual installation steps are needed for development.
+
 ```bash
-# Run in dev mode
+# Run in dev mode (auto-connects to Muninn)
 npm run dev
 
 # Watch mode
@@ -379,12 +361,12 @@ The i18n extension translates code by calling an LLM. By default it uses the **C
 
 The LLM integration is isolated to four files:
 
-| File | Role |
-|------|------|
-| `src/claude/cli.ts` | Spawns the LLM subprocess and parses the response |
-| `src/claude/prompts.ts` | Builds translation prompts and parses numbered-list responses |
-| `src/claude/translator.ts` | High-level API that batches terms and calls `callClaude()` |
-| `src/config/settings.ts` | Extension configuration (add provider/model settings here) |
+| File                       | Role                                                          |
+|----------------------------|---------------------------------------------------------------|
+| `src/claude/cli.ts`        | Spawns the LLM subprocess and parses the response             |
+| `src/claude/prompts.ts`    | Builds translation prompts and parses numbered-list responses |
+| `src/claude/translator.ts` | High-level API that batches terms and calls `callClaude()`    |
+| `src/config/settings.ts`   | Extension configuration (add provider/model settings here)    |
 
 Kawa Code is **not involved** in translation. It only provides repo metadata (origin, intents) via IPC.
 
@@ -565,11 +547,11 @@ Notice: `function` and `return` stay in English.
 
 The identifier extractor currently supports:
 
-| Language | File Extensions | Extraction Method |
-|----------|----------------|-------------------|
-| TypeScript / JavaScript | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` | Full AST via TypeScript Compiler API |
-| Vue | `.vue` | Extracts `<script>` block, then uses TS parser |
-| Rust | `.rs` | Regex-based pattern matching |
+| Language                | File Extensions                              | Extraction Method                              |
+|-------------------------|----------------------------------------------|------------------------------------------------|
+| TypeScript / JavaScript | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` | Full AST via TypeScript Compiler API           |
+| Vue                     | `.vue`                                       | Extracts `<script>` block, then uses TS parser |
+| Rust                    | `.rs`                                        | Regex-based pattern matching                   |
 
 ### Roadmap: Additional Languages
 
