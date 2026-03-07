@@ -35,7 +35,7 @@ import 'prismjs/components/prism-markup'
 
 // Register custom elements with the browser
 // The tag name must match what's declared in extension.json screens[].id
-// Muninn will look for: <{extensionId}-{screenId}> = <i18n-code-viewer>
+// Kawa Code will look for: <{extensionId}-{screenId}> = <i18n-code-viewer>
 if (!customElements.get('i18n-code-viewer')) {
   customElements.define('i18n-code-viewer', I18nCodeViewer)
   console.log('[i18n-ui] Registered custom element: i18n-code-viewer')

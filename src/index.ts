@@ -9,13 +9,13 @@
 
 import { createHash } from 'crypto';
 import { registerHandler, startListening, addResponseInterceptor, setRequestStream } from './ipc/handlers';
-import { log, sendProgress, sendBroadcast, setResponseStream, setTransport, flushProgressToMuninn } from './ipc/protocol';
-import { connectToMuninn, getDefaultMuninnSocketPath } from './ipc/muninn-socket';
+import { log, sendProgress, sendBroadcast, setResponseStream, setTransport, flushProgressToKawaCode } from './ipc/protocol';
+import { connectToKawaCode, getDefaultKawaCodeSocketPath } from './ipc/muninn-socket';
 import { CircularStreamBuffer } from './ipc/stream-buffer';
 import {
   startDirectServer,
   registerDirectHandler,
-  handleMuninnResponse,
+  handleKawaCodeResponse,
   getLanguage,
   setLanguage,
   getOriginForPath
@@ -188,7 +188,7 @@ const translationCache = new TranslationCache(100);
  * No special-casing for English - all languages are treated equally.
  * Uses MultiLangDictionary and UnifiedTranslator for consistent behavior.
  *
- * NOTE: Expects 'origin' to be added by Muninn before routing to this extension
+ * NOTE: Expects 'origin' to be added by Kawa Code before routing to this extension
  */
 async function handleTranslateCode(message: IPCMessage): Promise<any> {
   const { code, filePath, targetLang, origin, sourceLang: providedSourceLang, translationScope } = message.data;
@@ -199,7 +199,7 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
   if (!translationScope) {
     const errorMsg = 'Missing translationScope in translate-code request. Please configure translation scope in Settings.';
     log(`[TranslateCode] ERROR: ${errorMsg}`);
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'error',
       summary: 'Translation Scope Missing',
       detail: 'translate-code request is missing translationScope. The code viewer must send the user\'s scope settings.',
@@ -213,7 +213,7 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
     log(`[TIMING] Translation started for ${filePath} -> ${targetLang} (scope: c=${+scope.comments} s=${+scope.stringLiterals} i=${+scope.identifiers} k=${+scope.keywords} md=${+scope.markdownFiles})`);
 
     if (!origin) {
-      throw new Error('Missing origin - Muninn should add origin before routing to i18n extension');
+      throw new Error('Missing origin - Kawa Code should add origin before routing to i18n extension');
     }
 
     // Step 1: Use provided source language or default to English
@@ -316,7 +316,7 @@ async function triggerProjectScan(
 
   log(`Empty dictionary, triggering project scan at: ${workspaceRoot}`);
 
-  sendBroadcast('muninn', 'notification', {
+  sendBroadcast('kawa-code', 'notification', {
     severity: 'info',
     summary: 'Scanning Project',
     detail: 'Analyzing all source files for translation. This may take a moment...',
@@ -331,7 +331,7 @@ async function triggerProjectScan(
     data: { origin, targetLang, workspaceRoot }
   } as IPCMessage).catch((error: any) => {
     log(`[ERROR] Background project scan failed: ${error.message}`);
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'error',
       summary: 'Project Scan Failed',
       detail: error.message || 'Failed to scan project for translation',
@@ -392,7 +392,7 @@ async function translateNewTerms(
     log(`Stored terms in dictionary: ${JSON.stringify(termsToStore)}`);
   } catch (error: any) {
     log(`Warning: Failed to translate new terms locally: ${error.message}`);
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'warn',
       summary: 'Translation Incomplete',
       detail: `Could not translate ${terms.length} new term(s). They may remain untranslated.`,
@@ -506,7 +506,7 @@ async function translateProjectInBackground(taskId: string, origin: string, targ
     });
 
     // Show success notification AFTER everything is done
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'success',
       summary: 'Project Translation Complete',
       detail: `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments. You can now change the language in your editor to see the translated code.`,
@@ -523,7 +523,7 @@ async function translateProjectInBackground(taskId: string, origin: string, targ
     });
 
     // Show error notification
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'error',
       summary: 'Translation Failed',
       detail: error.message || 'Failed to translate project',
@@ -929,7 +929,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       const fileDesc = markdownFiles.length > 0
         ? `${files.length} code + ${markdownFiles.length} markdown files`
         : `${totalFilesToScan} files`;
-      sendBroadcast('muninn', 'notification', {
+      sendBroadcast('kawa-code', 'notification', {
         severity: 'info',
         summary: 'Large Project Detected',
         detail: `${fileDesc}, ${uniqueIdentifiers.length} terms. Click "Proceed" in the progress panel to start translation.`,
@@ -1015,7 +1015,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
     // Clear translation cache so stale results aren't served
     translationCache.clear();
 
-    // Send completion so the progress bar dismisses in Muninn
+    // Send completion so the progress bar dismisses in Kawa Code
     const completionDetail = allMarkdownTexts.length > 0
       ? `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} text blocks (comments + markdown).`
       : `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments.`;
@@ -1026,10 +1026,10 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       autoClose: true,
       autoCloseDelay: 3000,
     });
-    await flushProgressToMuninn();
+    await flushProgressToKawaCode();
 
     // Show success notification
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'success',
       summary: 'Project Translation Complete',
       detail: `${completionDetail} Open any file to see translations.`,
@@ -1155,7 +1155,7 @@ async function handleProceedTranslation(message: IPCMessage): Promise<any> {
     });
 
     // Show success notification
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'success',
       summary: 'Project Translation Complete',
       detail: `Translated ${translateResult.totalTerms} terms and ${translateResult.totalComments} comments. Open any file to see translations.`,
@@ -1179,7 +1179,7 @@ async function handleProceedTranslation(message: IPCMessage): Promise<any> {
     });
 
     // Show error notification
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'error',
       summary: 'Translation Failed',
       detail: error.message || 'Failed to translate project',
@@ -1223,9 +1223,9 @@ async function handleFileSaved(message: IPCMessage): Promise<any> {
       };
     }
 
-    // Origin should be enriched by Muninn before routing to this handler
+    // Origin should be enriched by Kawa Code before routing to this handler
     if (!origin) {
-      log(`[FileSave] No origin provided by Muninn, skipping translation`);
+      log(`[FileSave] No origin provided by Kawa Code, skipping translation`);
       return {
         success: true,
         code: code,
@@ -1449,7 +1449,7 @@ async function handleHeadChanged(message: IPCMessage): Promise<void> {
   log(`[HeadChanged] Triggering project scan for ${origin} -> ${targetLang}`);
 
   // Show notification to user
-  sendBroadcast('muninn', 'notification', {
+  sendBroadcast('kawa-code', 'notification', {
     severity: 'info',
     summary: 'Git Changes Detected',
     detail: `Scanning project for new terms to translate...`,
@@ -1465,7 +1465,7 @@ async function handleHeadChanged(message: IPCMessage): Promise<void> {
     data: { origin, targetLang, workspaceRoot }
   } as IPCMessage).catch((error: any) => {
     log(`[HeadChanged] Project scan failed: ${error.message}`);
-    sendBroadcast('muninn', 'notification', {
+    sendBroadcast('kawa-code', 'notification', {
       severity: 'error',
       summary: 'Scan Failed',
       detail: `Failed to scan for new terms: ${error.message}`,
@@ -1655,7 +1655,7 @@ async function handleTestProgress(message: IPCMessage): Promise<any> {
 }
 
 /**
- * Handle auth:info broadcast from Muninn
+ * Handle auth:info broadcast from Kawa Code
  * Stores auth tokens in memory for API calls
  */
 function handleAuthInfo(message: IPCMessage): void {
@@ -1665,11 +1665,11 @@ function handleAuthInfo(message: IPCMessage): void {
 }
 
 /**
- * Handle extension:ready broadcast from Muninn
- * Signals that Muninn is ready and provides initial auth state
+ * Handle extension:ready broadcast from Kawa Code
+ * Signals that Kawa Code is ready and provides initial auth state
  */
 function handleExtensionReady(message: IPCMessage): void {
-  log('[Extension] Received extension:ready from Muninn');
+  log('[Extension] Received extension:ready from Kawa Code');
 
   // Store auth state from the ready message
   const data = message.data;
@@ -1689,7 +1689,7 @@ function handleExtensionReady(message: IPCMessage): void {
 
 /**
  * Handle direct translate-code request from Huginn
- * Enriches with origin (from cache/Muninn)
+ * Enriches with origin (from cache/Kawa Code)
  *
  * For DISPLAY translation (showing user their preferred language):
  * - Source is ALWAYS English (files on disk are stored in English)
@@ -1702,7 +1702,7 @@ async function handleDirectTranslateCode(message: IPCMessage, caw: string): Prom
 
   log(`[Direct] translate-code for ${filePath} -> ${targetLang}`);
 
-  // Get origin from cache or Muninn
+  // Get origin from cache or Kawa Code
   const originResult = await getOriginForPath(filePath);
   if (!originResult) {
     return {
@@ -1736,7 +1736,7 @@ async function handleDirectFileSaved(message: IPCMessage, caw: string): Promise<
 
   log(`[Direct] file-saved for ${filePath}`);
 
-  // Get origin from cache or Muninn
+  // Get origin from cache or Kawa Code
   const originResult = await getOriginForPath(filePath);
   if (!originResult) {
     return {
@@ -1821,13 +1821,13 @@ async function main() {
   log(`=== Kawa i18n Extension v${VERSION} ===`);
 
   // -------------------------------------------------------------------------
-  // STDIN HANDLERS (Muninn communication)
+  // STDIN HANDLERS (Kawa Code communication)
   // -------------------------------------------------------------------------
 
-  // Register response interceptor to handle our own Muninn requests
-  addResponseInterceptor(handleMuninnResponse);
+  // Register response interceptor to handle our own Kawa Code requests
+  addResponseInterceptor(handleKawaCodeResponse);
 
-  // Register request handlers for Muninn routing
+  // Register request handlers for Kawa Code routing
   registerHandler('i18n', 'translate-code', handleTranslateCode);
   registerHandler('i18n', 'file-saved', handleFileSaved);
   registerHandler('i18n', 'scan-project', handleScanProject);
@@ -1852,7 +1852,7 @@ async function main() {
   registerHandler('i18n', 'translate-intent-metadata', handleTranslateIntentMetadata);
   registerHandler('i18n', 'detect-language', handleDetectLanguage);
 
-  // Register intent handlers (for Muninn routing - legacy, may be intercepted by Gardener)
+  // Register intent handlers (for Kawa Code routing - legacy, may be intercepted by Gardener)
   registerHandler('intent', 'get-for-file', handleGetIntentsForFile);
   registerHandler('intent', 'get-for-lines', handleGetIntentsForLines);
   registerHandler('intent', 'normalize', handleNormalizeIntent);
@@ -1863,10 +1863,10 @@ async function main() {
   registerHandler('repo', 'active-path', handleActivePath);
   registerHandler('repo', 'head-changed', handleHeadChanged);
 
-  // Register auth handler to receive tokens from Muninn
+  // Register auth handler to receive tokens from Kawa Code
   registerHandler('auth', 'info', handleAuthInfo);
 
-  // Register extension:ready handler to know when Muninn is ready
+  // Register extension:ready handler to know when Kawa Code is ready
   registerHandler('extension', 'ready', handleExtensionReady);
 
   // Determine transport mode: socket or stdin/stdout
@@ -1875,21 +1875,21 @@ async function main() {
     || (muninnSocketArg ? muninnSocketArg.split('=')[1] : undefined);
 
   if (muninnSocketPath) {
-    // Socket mode: connect to Muninn as extension client
-    log(`Connecting to Muninn socket at: ${muninnSocketPath}`);
+    // Socket mode: connect to Kawa Code as extension client
+    log(`Connecting to Kawa Code socket at: ${muninnSocketPath}`);
     try {
-      const transport = await connectToMuninn(muninnSocketPath);
+      const transport = await connectToKawaCode(muninnSocketPath);
       setTransport(transport.writable, 'socket');
       startListening(transport.readable);
-      log('Running in socket mode (Muninn IPC client)');
+      log('Running in socket mode (Kawa Code IPC client)');
     } catch (err: any) {
-      log(`[Fatal] Failed to connect to Muninn socket: ${err.message}`);
+      log(`[Fatal] Failed to connect to Kawa Code socket: ${err.message}`);
       process.exit(1);
     }
   } else if (!process.stdin.isTTY) {
-    // Legacy stdin/stdout mode (spawned by Muninn)
+    // Legacy stdin/stdout mode (spawned by Kawa Code)
     startListening();
-    log('Running in stdin/stdout mode (spawned by Muninn)');
+    log('Running in stdin/stdout mode (spawned by Kawa Code)');
 
     // Initialize stream buffers for large message support (stdin mode only)
     {
@@ -1913,16 +1913,16 @@ async function main() {
       }
     }
   } else {
-    // Interactive TTY mode: try connecting to Muninn socket at default path
-    const defaultPath = getDefaultMuninnSocketPath();
+    // Interactive TTY mode: try connecting to Kawa Code socket at default path
+    const defaultPath = getDefaultKawaCodeSocketPath();
     log(`No MUNINN_SOCKET env or stdin pipe. Trying default socket: ${defaultPath}`);
     try {
-      const transport = await connectToMuninn(defaultPath);
+      const transport = await connectToKawaCode(defaultPath);
       setTransport(transport.writable, 'socket');
       startListening(transport.readable);
       log('Running in socket mode (auto-detected default path)');
     } catch (err: any) {
-      log(`[Fatal] Cannot start: no stdin pipe and no Muninn socket at ${defaultPath}: ${err.message}`);
+      log(`[Fatal] Cannot start: no stdin pipe and no Kawa Code socket at ${defaultPath}: ${err.message}`);
       process.exit(1);
     }
   }
@@ -1948,11 +1948,11 @@ async function main() {
     log('Direct IPC server started - Huginn clients can connect directly');
   } catch (error: any) {
     log(`[Warning] Failed to start direct IPC server: ${error.message}`);
-    log('Huginn clients will use Muninn routing as fallback');
+    log('Huginn clients will use Kawa Code routing as fallback');
   }
 
   const mode = muninnSocketPath || process.stdin.isTTY ? 'socket' : 'stdin';
-  log(`i18n extension ready (Muninn ${mode} + Direct IPC)`);
+  log(`i18n extension ready (Kawa Code ${mode} + Direct IPC)`);
 }
 
 // Handle uncaught errors

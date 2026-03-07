@@ -400,7 +400,7 @@ function mergeWithConflictMarking(local: Dictionary, remote: Dictionary): Dictio
 }
 ```
 
-**User Resolution UI** (Muninn or VSCode):
+**User Resolution UI** (Kawa Code or VSCode):
 ```
 Conflict detected for term "calculate":
   Local:  "計算する"
@@ -487,7 +487,7 @@ await syncDictionary(origin, language)
 
 **Triggers**:
 - User command: "Sync Dictionary"
-- Button in Muninn UI
+- Button in Kawa Code UI
 - Keyboard shortcut
 
 **Frequency**: On-demand
@@ -674,7 +674,7 @@ Translation complete! 47/50 terms translated.
 
 **Flow**:
 ```
-1. User opens dictionary editor (Muninn UI or VSCode panel)
+1. User opens dictionary editor (Kawa Code UI or VSCode panel)
 2. User adds term:
    English: "calculateSum"
    Japanese: "合計を計算"
@@ -682,7 +682,7 @@ Translation complete! 47/50 terms translated.
 4. Optionally push to API
 ```
 
-**UI** (Muninn dictionary editor):
+**UI** (Kawa Code dictionary editor):
 ```
 Dictionary: github.com/user/repo (Japanese)
 

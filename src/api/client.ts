@@ -40,10 +40,10 @@ export interface TranslateProjectResponse extends DictionaryData {
 /**
  * Get authentication token from auth store or environment
  *
- * Auth tokens are received from Muninn via brdc:auth:info broadcasts
+ * Auth tokens are received from Kawa Code via brdc:auth:info broadcasts
  * and stored in memory. This is more secure than reading from encrypted
  * storage because:
- * 1. Only Muninn handles encryption/decryption
+ * 1. Only Kawa Code handles encryption/decryption
  * 2. Tokens only exist in memory (not persisted by extensions)
  * 3. Single point of credential management
  */
@@ -53,7 +53,7 @@ function getAuthToken(): string | null {
     return process.env.KAWA_AUTH_TOKEN;
   }
 
-  // Get token from in-memory auth store (received from Muninn)
+  // Get token from in-memory auth store (received from Kawa Code)
   return getAccessToken();
 }
 

@@ -6,7 +6,7 @@
  */
 
 import { IPCMessage, log } from '../ipc/protocol';
-import { requestFromMuninn, getLanguage } from '../ipc/server';
+import { requestFromKawaCode, getLanguage } from '../ipc/server';
 import { intentCacheManager, blockContentCacheManager } from './cache';
 import {
   translateText as localTranslateText,
@@ -189,7 +189,7 @@ export async function handleGetIntentsForFile(message: IPCMessage): Promise<Inte
     log(`[Intent] Getting intents for file: ${filePath} (${lang})`);
 
     // Query Gardener for intents
-    const response = await requestFromMuninn({
+    const response = await requestFromKawaCode({
       flow: 'req',
       domain: 'intent-block',
       action: 'get-for-file',
@@ -256,7 +256,7 @@ export async function handleGetIntentsForLines(message: IPCMessage): Promise<Int
     log(`[Intent] Getting intents for lines ${startLine}-${endLine} in ${filePath}`);
 
     // Query Gardener for intents
-    const response = await requestFromMuninn({
+    const response = await requestFromKawaCode({
       flow: 'req',
       domain: 'intent-block',
       action: 'get-for-lines',
@@ -783,7 +783,7 @@ export async function handleGetBlockContentTranslated(
     }
 
     // Fetch raw content from Gardener
-    const response = await requestFromMuninn({
+    const response = await requestFromKawaCode({
       flow: 'req',
       domain: 'intent-block',
       action: 'get-content',

@@ -1,12 +1,12 @@
-# i18n Extension Event Flow to Muninn
+# i18n Extension Event Flow to Kawa Code
 
-This document explains how the kawa.i18n extension sends events (progress updates, notifications) to the Muninn UI.
+This document explains how the kawa.i18n extension sends events (progress updates, notifications) to the Kawa Code UI.
 
 ---
 
 ## Overview
 
-The i18n extension communicates with Muninn using **broadcast messages** sent via STDOUT. These broadcasts are specifically designed for UI updates and don't require a response.
+The i18n extension communicates with Kawa Code using **broadcast messages** sent via STDOUT. These broadcasts are specifically designed for UI updates and don't require a response.
 
 ---
 
@@ -16,7 +16,7 @@ The extension uses three types of messages:
 
 ### 1. Response (`flow: 'res'`)
 **Purpose**: Reply to a request
-**Direction**: Extension → Caller (VSCode, Muninn, etc.)
+**Direction**: Extension → Caller (VSCode, Kawa Code, etc.)
 **Example**: Returning translated code
 
 ### 2. Error (`flow: 'err'`)
@@ -24,10 +24,10 @@ The extension uses three types of messages:
 **Direction**: Extension → Caller
 **Example**: Dictionary not found error
 
-### 3. **Broadcast (`flow: 'brdc')** ← **Used for Muninn UI events**
-**Purpose**: Send unsolicited updates to Muninn UI
-**Direction**: Extension → Muninn UI only
-**Target**: Always `caw: '0'` (Muninn's identifier)
+### 3. **Broadcast (`flow: 'brdc')** ← **Used for Kawa Code UI events**
+**Purpose**: Send unsolicited updates to Kawa Code UI
+**Direction**: Extension → Kawa Code UI only
+**Target**: Always `caw: '0'` (Kawa Code's identifier)
 **Example**: Translation progress updates
 
 ---
@@ -39,7 +39,7 @@ The extension uses three types of messages:
   flow: 'brdc',           // Broadcast (no response expected)
   domain: 'i18n',         // Extension domain
   action: 'progress',     // Action type (usually 'progress')
-  caw: '0',               // Always '0' for Muninn
+  caw: '0',               // Always '0' for Kawa Code
   data: {
     taskId: string,       // Unique task identifier
     taskName: string,     // Human-readable task name
@@ -62,7 +62,7 @@ The extension uses three types of messages:
    ↓
 3. Extension starts processing
    ↓
-4. Extension sends BROADCAST to Muninn UI (via STDOUT)
+4. Extension sends BROADCAST to Kawa Code UI (via STDOUT)
    {
      flow: 'brdc',
      domain: 'i18n',
@@ -71,7 +71,7 @@ The extension uses three types of messages:
      data: { status: 'started', ... }
    }
    ↓
-5. Muninn UI receives broadcast and shows progress notification
+5. Kawa Code UI receives broadcast and shows progress notification
    ↓
 6. Extension continues processing
    ↓
@@ -84,7 +84,7 @@ The extension uses three types of messages:
      data: { status: 'complete', ... }
    }
    ↓
-8. Muninn UI updates notification (e.g., shows success, auto-closes)
+8. Kawa Code UI updates notification (e.g., shows success, auto-closes)
    ↓
 9. Extension sends RESPONSE to VSCode
    {
@@ -107,14 +107,14 @@ The extension uses three types of messages:
 
 ```typescript
 /**
- * Send broadcast message (progress updates to Muninn UI)
+ * Send broadcast message (progress updates to Kawa Code UI)
  */
 export function sendBroadcast(domain: string, action: string, data: any): void {
   const broadcast: IPCMessage = {
     flow: 'brdc',
     domain,
     action,
-    caw: '0', // Muninn is always caw '0'
+    caw: '0', // Kawa Code is always caw '0'
     data,
   };
 
@@ -128,7 +128,7 @@ export function sendBroadcast(domain: string, action: string, data: any): void {
 
 ```typescript
 /**
- * Send progress update to Muninn UI
+ * Send progress update to Kawa Code UI
  */
 export function sendProgress(
   taskId: string,
@@ -176,7 +176,7 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
         translatedTokens: result.translatedTokens.length,
         unmappedTokens: result.unmappedTokens.length,
       },
-      autoClose: true,      // Tell Muninn to auto-close notification
+      autoClose: true,      // Tell Kawa Code to auto-close notification
       autoCloseDelay: 2000, // After 2 seconds
     });
 
@@ -203,21 +203,21 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
 
 ---
 
-## What Muninn Does With Broadcasts
+## What Kawa Code Does With Broadcasts
 
-When Muninn receives a broadcast from the i18n extension:
+When Kawa Code receives a broadcast from the i18n extension:
 
 ### 1. **Broadcast Router**
-Muninn's extension router identifies the message:
+Kawa Code's extension router identifies the message:
 - `flow === 'brdc'` → Broadcast message
-- `caw === '0'` → Intended for Muninn UI
+- `caw === '0'` → Intended for Kawa Code UI
 - `domain === 'i18n'` → From i18n extension
 - `action === 'progress'` → Progress update
 
 ### 2. **UI Handler**
-Muninn passes the broadcast to the UI layer (Vue.js):
+Kawa Code passes the broadcast to the UI layer (Vue.js):
 ```javascript
-// In Muninn Vue.js frontend
+// In Kawa Code Vue.js frontend
 eventBus.emit('extension-progress', {
   extension: 'i18n',
   taskId: 'translate-ja-1234567890',
@@ -228,7 +228,7 @@ eventBus.emit('extension-progress', {
 ```
 
 ### 3. **Notification Display**
-The Muninn UI shows a notification/toast:
+The Kawa Code UI shows a notification/toast:
 ```
 ┌─────────────────────────────────┐
 │ 🔄 Code Translation             │
@@ -269,7 +269,7 @@ When status changes to 'complete':
      │        │    status: 'started'
      │        ↓
      │    ┌─────────┐
-     │    │ Muninn  │
+     │    │ Kawa Code  │
      │    │   UI    │ → Shows: "🔄 Translating..."
      │    └─────────┘
      │
@@ -281,7 +281,7 @@ When status changes to 'complete':
      │        │    status: 'complete'
      │        ↓
      │    ┌─────────┐
-     │    │ Muninn  │
+     │    │ Kawa Code  │
      │    │   UI    │ → Shows: "✅ Translated 11 terms"
      │    └─────────┘
      │
@@ -300,14 +300,14 @@ When status changes to 'complete':
 ### 1. **No Response Required**
 Broadcasts (`flow: 'brdc'`) don't expect a response. They're fire-and-forget messages for UI updates.
 
-### 2. **Always Target Muninn**
-Broadcasts always use `caw: '0'` which is Muninn's identifier. This ensures they go to the UI layer.
+### 2. **Always Target Kawa Code**
+Broadcasts always use `caw: '0'` which is Kawa Code's identifier. This ensures they go to the UI layer.
 
 ### 3. **Parallel Communication**
-The extension can send broadcasts to Muninn while also returning responses to VSCode. They're independent communication channels.
+The extension can send broadcasts to Kawa Code while also returning responses to VSCode. They're independent communication channels.
 
 ### 4. **Task Identification**
-Each task gets a unique `taskId` (e.g., `translate-ja-1702123456789`) so Muninn can track multiple concurrent operations.
+Each task gets a unique `taskId` (e.g., `translate-ja-1702123456789`) so Kawa Code can track multiple concurrent operations.
 
 ### 5. **Rich Status Information**
 Broadcasts can include:
@@ -345,11 +345,11 @@ started → [progress]* → complete
 
 ---
 
-## Muninn UI Integration Points
+## Kawa Code UI Integration Points
 
-### Expected Muninn Handlers
+### Expected Kawa Code Handlers
 
-Muninn should handle these broadcasts:
+Kawa Code should handle these broadcasts:
 
 1. **`i18n:progress`** - Translation progress updates
    ```typescript
@@ -401,22 +401,22 @@ This will output to STDOUT:
 {"flow":"brdc","domain":"i18n","action":"progress","caw":"0","data":{"taskId":"test-task-123","taskName":"Test Task","status":"started","statusMessage":"Testing broadcast system...","details":{"foo":"bar"}}}
 ```
 
-Muninn should receive and display this as a notification.
+Kawa Code should receive and display this as a notification.
 
 ---
 
 ## Summary
 
-**How i18n injects events into Muninn**:
+**How i18n injects events into Kawa Code**:
 
 1. **Mechanism**: STDOUT broadcast messages with `flow: 'brdc'` and `caw: '0'`
 2. **Format**: JSON objects following Kawa IPC protocol
 3. **Purpose**: Progress updates, notifications, status changes
 4. **Examples**: Translation started/complete, errors, dictionary updates
-5. **Muninn's Role**: Receive broadcasts via extension router, display in UI
+5. **Kawa Code's Role**: Receive broadcasts via extension router, display in UI
 
 **Key Functions**:
 - `sendBroadcast(domain, action, data)` - Generic broadcast
 - `sendProgress(taskId, taskName, status, details)` - Specific progress updates
 
-**Result**: Real-time UI updates in Muninn while the extension processes requests!
+**Result**: Real-time UI updates in Kawa Code while the extension processes requests!

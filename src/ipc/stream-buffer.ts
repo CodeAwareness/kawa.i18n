@@ -7,7 +7,7 @@
  * Metadata (.meta JSON file, snake_case keys):
  *   {"write_pos": 0, "read_pos": 0, "size": 1048576, "last_rotation": 1707234567890}
  *
- * Used for bidirectional large-message IPC between Muninn and extensions.
+ * Used for bidirectional large-message IPC between Kawa Code and extensions.
  */
 
 import * as fs from 'fs';

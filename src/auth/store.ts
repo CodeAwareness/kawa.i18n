@@ -1,7 +1,7 @@
 /**
- * Auth Store - In-memory storage for auth tokens received from Muninn
+ * Auth Store - In-memory storage for auth tokens received from Kawa Code
  *
- * Tokens are received via brdc:auth:info broadcasts from Muninn.
+ * Tokens are received via brdc:auth:info broadcasts from Kawa Code.
  * This module stores them in memory and provides access to the API client.
  */
 
@@ -37,7 +37,7 @@ let authState: AuthState = {
 };
 
 /**
- * Update auth state from Muninn broadcast
+ * Update auth state from Kawa Code broadcast
  */
 export function setAuthState(data: any): void {
   authState = {

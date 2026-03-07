@@ -1,4 +1,4 @@
-# Create a directory junction so Muninn loads the i18n extension from this repo.
+# Create a directory junction so Kawa Code loads the i18n extension from this repo.
 # Run from the kawa.i18n repo root. Requires no admin.
 # Usage: .\link-extension-i18n.ps1 [-Target "C:\path\to\kawa.i18n"]
 # If -Target is omitted, uses the directory containing this script.
@@ -34,4 +34,4 @@ if (Test-Path $linkPath) {
 
 New-Item -ItemType Junction -Path $linkPath -Target $Target | Out-Null
 Write-Host "Created junction: $linkPath -> $Target"
-Write-Host "Muninn will load the i18n extension from your repo."
+Write-Host "Kawa Code will load the i18n extension from your repo."

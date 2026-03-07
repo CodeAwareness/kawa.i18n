@@ -6,7 +6,7 @@
  * - Individual scope checkboxes (comments, strings, identifiers, keywords)
  *
  * Built with Lit and uses Shadow DOM for style isolation.
- * Supports multiple languages via kawa-language-changed events from Muninn.
+ * Supports multiple languages via kawa-language-changed events from Kawa Code.
  */
 
 import { LitElement, html, css } from 'lit'

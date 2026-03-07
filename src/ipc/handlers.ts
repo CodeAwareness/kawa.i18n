@@ -21,7 +21,7 @@ type ResponseInterceptor = (message: IPCMessage) => boolean;
 const responseInterceptors: ResponseInterceptor[] = [];
 
 /**
- * Stream buffer for reading large requests from Muninn
+ * Stream buffer for reading large requests from Kawa Code
  */
 let requestStream: CircularStreamBuffer | null = null;
 
@@ -56,7 +56,7 @@ export function registerHandler(
  * Dispatch a parsed IPC message to the appropriate handler.
  */
 async function dispatchMessage(message: IPCMessage): Promise<void> {
-  // Check response interceptors first (for our own Muninn requests)
+  // Check response interceptors first (for our own Kawa Code requests)
   for (const interceptor of responseInterceptors) {
     if (interceptor(message)) {
       log(`Message intercepted as response: ${message.domain}:${message.action}`);
@@ -100,7 +100,7 @@ async function dispatchMessage(message: IPCMessage): Promise<void> {
  * Start listening for IPC messages.
  *
  * @param inputStream - Optional readable stream to listen on (defaults to process.stdin).
- *                      In socket mode, pass the Muninn socket's readable stream.
+ *                      In socket mode, pass the Kawa Code socket's readable stream.
  */
 export function startListening(inputStream?: Readable): void {
   const input = inputStream || process.stdin;
@@ -156,5 +156,5 @@ export function startListening(inputStream?: Readable): void {
     process.exit(0);
   });
 
-  log(`IPC listener started on ${inputStream ? 'Muninn socket' : 'STDIN'}`);
+  log(`IPC listener started on ${inputStream ? 'Kawa Code socket' : 'STDIN'}`);
 }

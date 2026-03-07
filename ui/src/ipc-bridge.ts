@@ -1,7 +1,7 @@
 /**
- * IPC Bridge for communicating with Muninn
+ * IPC Bridge for communicating with Kawa Code
  *
- * Web Components dispatch 'kawa-ipc' events which Muninn's
+ * Web Components dispatch 'kawa-ipc' events which Kawa Code's
  * ExtensionScreen component intercepts and routes to the appropriate
  * domain handler (Gardener or extensions).
  */
@@ -13,7 +13,7 @@ const pendingRequests = new Map<string, {
 }>()
 
 /**
- * Send an IPC request to Muninn
+ * Send an IPC request to Kawa Code
  *
  * @param element - The custom element dispatching the event
  * @param domain - The domain to route to (e.g., 'i18n', 'repo', 'file')
@@ -65,7 +65,7 @@ export function sendIPCRequest(
 }
 
 /**
- * Handle IPC response from Muninn
+ * Handle IPC response from Kawa Code
  *
  * @param event - The kawa-ipc-response CustomEvent
  */

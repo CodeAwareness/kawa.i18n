@@ -12,7 +12,7 @@ The kawa.i18n extension provides code internationalization for Kawa Code. It tra
 
 **Core Pattern**: Dual Domain Architecture
 - **Domain `i18n`**: Handle translation requests
-- **Domain `extension-progress`**: Broadcast progress to Muninn UI
+- **Domain `extension-progress`**: Broadcast progress to Kawa Code UI
 
 ---
 
@@ -31,21 +31,21 @@ Extensions declare their domains in `extension.json`:
 }
 ```
 
-**Muninn builds a routing table at startup**:
+**Kawa Code builds a routing table at startup**:
 ```
 i18n               → kawa.i18n extension
-extension-progress → Muninn UI Progress Handler (built-in)
+extension-progress → Kawa Code UI Progress Handler (built-in)
 gardener           → Gardener module (built-in)
 ```
 
-**Key Principle**: Muninn knows NOTHING about specific extensions. It just routes messages based on the `domain` field.
+**Key Principle**: Kawa Code knows NOTHING about specific extensions. It just routes messages based on the `domain` field.
 
 ### Dual Domain Pattern
 
 | Domain | Purpose | Flow Type | Who Handles |
 |--------|---------|-----------|-------------|
 | `i18n` | Translation requests | `req → res/err` | kawa.i18n extension |
-| `extension-progress` | Progress updates | `brdc` (broadcast) | Muninn UI (built-in) |
+| `extension-progress` | Progress updates | `brdc` (broadcast) | Kawa Code UI (built-in) |
 
 ---
 
@@ -57,14 +57,14 @@ gardener           → Gardener module (built-in)
 VSCode Extension
   │ Send: { domain: 'i18n', action: 'translate-code', ... }
   ↓
-Muninn IPC Router
+Kawa Code IPC Router
   │ Routing table: 'i18n' → kawa.i18n extension
   ↓
 kawa.i18n Extension (STDIN)
   │ Process translation
   │ Send response: { flow: 'res', domain: 'i18n', ... }
   ↓
-Muninn IPC Router
+Kawa Code IPC Router
   │ Route back to VSCode
   ↓
 VSCode Extension
@@ -78,10 +78,10 @@ kawa.i18n Extension
   │ Send: { flow: 'brdc', domain: 'extension-progress',
   │         data: { extensionId: 'i18n', ... } }
   ↓ (STDOUT)
-Muninn IPC Router
+Kawa Code IPC Router
   │ Routing table: 'extension-progress' → UI Progress Handler
   ↓
-Muninn Progress Store (Vue.js)
+Kawa Code Progress Store (Vue.js)
   │ Identify extension by 'extensionId'
   │ Update task map
   ↓
@@ -349,7 +349,7 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
 
 ### 1. Startup
 
-1. Muninn scans `~/.kawa-code/extensions/`
+1. Kawa Code scans `~/.kawa-code/extensions/`
 2. Reads `extension.json` manifests
 3. Builds routing table: `{ 'i18n': <i18n extension process> }`
 4. Spawns extension via `dev.sh` or binary
@@ -367,11 +367,11 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
 6. Handler returns result
 7. `handlers.ts` wraps in response: `{ flow: 'res', domain: 'i18n', ... }`
 8. Sends to STDOUT
-9. Muninn routes response back to VSCode
+9. Kawa Code routes response back to VSCode
 
 ### 3. Shutdown
 
-1. STDIN closes (Muninn shutdown or reload)
+1. STDIN closes (Kawa Code shutdown or reload)
 2. `handlers.ts` receives `close` event
 3. Logs: `[i18n] STDIN closed, exiting`
 4. `process.exit(0)`
@@ -413,9 +413,9 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
 ## Benefits of Domain Registration Design
 
 ### 1. Zero Coupling
-- Muninn has NO extension-specific code
+- Kawa Code has NO extension-specific code
 - Generic routing based on `domain` field
-- Extensions can be added/removed without touching Muninn
+- Extensions can be added/removed without touching Kawa Code
 
 ### 2. Clear Separation
 - Each extension owns its domain
@@ -434,7 +434,7 @@ async function handleTranslateCode(message: IPCMessage): Promise<any> {
 
 ### 5. Scalability
 - Adding new extension: just add manifest + binary
-- Muninn routing logic unchanged
+- Kawa Code routing logic unchanged
 - Multiple extensions run in parallel without conflicts
 
 ---
@@ -495,7 +495,7 @@ npm run build
 [i18n] Translating src/calc.ts: en -> ja
 ```
 
-**Muninn logs** (routing):
+**Kawa Code logs** (routing):
 ```
 Routing message domain='i18n' to extension 'i18n'
 Extension 'i18n' responded with success
@@ -527,9 +527,9 @@ Extension 'i18n' responded with success
 
 ## Architecture Principles Summary
 
-1. **Domain-Based Routing**: Extensions register domains, Muninn routes generically
+1. **Domain-Based Routing**: Extensions register domains, Kawa Code routes generically
 2. **Dual Domain Pattern**: Custom domain for requests + standard domain for progress
-3. **Zero Coupling**: Muninn knows nothing about specific extensions
+3. **Zero Coupling**: Kawa Code knows nothing about specific extensions
 4. **Explicit Registration**: Manifest declares capabilities upfront
 5. **Consistent UI**: All extensions use same progress protocol
 6. **AST Preservation**: Translation preserves code structure and formatting

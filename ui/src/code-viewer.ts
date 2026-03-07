@@ -602,7 +602,7 @@ const componentStyles = css`
 export class I18nCodeViewer extends LitElement {
   static styles = [prismStyles, componentStyles]
 
-  // Properties passed from Muninn via ExtensionScreen
+  // Properties passed from Kawa Code via ExtensionScreen
   @property({ type: String }) caw = '0'
   @property({ type: String }) origin = ''
   @property({ type: String, attribute: 'project-root' }) projectRoot = ''

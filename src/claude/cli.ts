@@ -4,7 +4,7 @@
  * Spawns the claude CLI subprocess for local translation.
  * This keeps all code on the user's machine, maintaining the zero-knowledge privacy model.
  *
- * Pattern based on kawa.muninn's claude_api.rs implementation.
+ * Pattern based on Kawa Code's claude_api.rs implementation.
  */
 
 import { spawn, ChildProcess } from 'child_process';

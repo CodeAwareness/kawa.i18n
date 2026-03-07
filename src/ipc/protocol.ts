@@ -1,5 +1,5 @@
 /**
- * IPC Protocol for Muninn Extension Communication
+ * IPC Protocol for Kawa Code Extension Communication
  *
  * Messages follow the Kawa IPC structure:
  * {
@@ -28,7 +28,7 @@ export interface IPCMessage {
  * Transport mode for output messages.
  *
  * - 'stdio': Messages are prefixed with "MUNINN START:0 " (legacy stdin/stdout mode)
- * - 'socket': Plain JSON lines over Muninn socket (no prefix)
+ * - 'socket': Plain JSON lines over Kawa Code socket (no prefix)
  */
 let transportMode: 'stdio' | 'socket' = 'stdio';
 
@@ -39,7 +39,7 @@ let outputStream: Writable = process.stdout;
 
 /**
  * Set the output transport for all protocol messages.
- * In socket mode, messages are sent as plain JSON lines (no MUNINN START prefix).
+ * In socket mode, messages are sent as plain JSON lines (no protocol prefix).
  */
 export function setTransport(stream: Writable, mode: 'stdio' | 'socket' = 'socket'): void {
   outputStream = stream;
@@ -60,7 +60,7 @@ function writeMessage(serialized: string): void {
 }
 
 /**
- * Stream buffer for writing large responses back to Muninn
+ * Stream buffer for writing large responses back to Kawa Code
  */
 let responseStream: CircularStreamBuffer | null = null;
 
@@ -90,7 +90,7 @@ export function sendResponse(request: IPCMessage, data: any): void {
   if (byteLength >= STREAM_THRESHOLD_BYTES && responseStream) {
     try {
       responseStream.write(response);
-      // Send a lightweight notification so Muninn knows to read from stream
+      // Send a lightweight notification so Kawa Code knows to read from stream
       const notification = JSON.stringify({
         flow: 'res',
         domain: request.domain,
@@ -131,14 +131,14 @@ export function sendError(request: IPCMessage, error: Error | string): void {
 }
 
 /**
- * Send broadcast message (progress updates to Muninn UI)
+ * Send broadcast message (progress updates to Kawa Code UI)
  */
 export function sendBroadcast(domain: string, action: string, data: any): void {
   const broadcast: IPCMessage = {
     flow: 'brdc',
     domain,
     action,
-    caw: '0', // Muninn is always caw '0'
+    caw: '0', // Kawa Code is always caw '0'
     data,
   };
 
@@ -146,7 +146,7 @@ export function sendBroadcast(domain: string, action: string, data: any): void {
 }
 
 /**
- * Send progress update to Muninn UI
+ * Send progress update to Kawa Code UI
  * Uses the standard extension-progress protocol
  */
 export function sendProgress(
@@ -169,7 +169,7 @@ export function sendProgress(
     flow: 'brdc',
     domain: 'extension-progress',
     action,
-    caw: '0', // Muninn
+    caw: '0', // Kawa Code
     data: {
       extensionId: 'i18n',
       taskId,
@@ -182,10 +182,10 @@ export function sendProgress(
 }
 
 /**
- * Flush stdout so the last progress message (e.g. complete) is delivered to Muninn
+ * Flush stdout so the last progress message (e.g. complete) is delivered to Kawa Code
  * before the handler returns. Call after sendProgress(..., 'complete', ...).
  */
-export function flushProgressToMuninn(): Promise<void> {
+export function flushProgressToKawaCode(): Promise<void> {
   return new Promise((resolve) => {
     process.stdout.write('', () => resolve());
   });
@@ -217,7 +217,7 @@ export function log(message: string, ...args: any[]): void {
     ? `${formattedMessage} ${args.map(a => JSON.stringify(a)).join(' ')}`
     : formattedMessage;
 
-  // Log to stderr (for Muninn to see)
+  // Log to stderr (for Kawa Code to see)
   console.error(fullMessage);
 
   // Log to file

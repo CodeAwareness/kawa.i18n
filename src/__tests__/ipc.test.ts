@@ -123,7 +123,7 @@ describe('IPC Protocol', () => {
       expect(response.flow).toBe('brdc');
       expect(response.domain).toBe('test');
       expect(response.action).toBe('notify');
-      expect(response.caw).toBe('0'); // Muninn caw
+      expect(response.caw).toBe('0'); // Kawa Code caw
       expect(response.data.message).toBe('broadcast');
     });
   });

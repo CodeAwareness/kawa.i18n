@@ -1,13 +1,13 @@
 /**
- * Muninn Socket Transport for Extension Client Mode
+ * Kawa Code Socket Transport for Extension Client Mode
  *
- * Connects to Muninn's Huginn IPC socket as an extension client,
+ * Connects to Kawa Code's Huginn IPC socket as an extension client,
  * replacing stdin/stdout communication with socket-based IPC.
  *
  * Used when:
- * - MUNINN_SOCKET env var is set
- * - --muninn-socket CLI arg is provided
- * - Running as standalone extension outside of Muninn's process management
+ * - KAWA_CODE_SOCKET env var is set
+ * - --kawa-code-socket CLI arg is provided
+ * - Running as standalone extension outside of Kawa Code's process management
  */
 import * as net from 'net';
 import * as fs from 'fs';
@@ -39,7 +39,7 @@ function loadExtensionManifest(): Record<string, unknown> | null {
     const content = fs.readFileSync(manifestPath, 'utf-8');
     return JSON.parse(content);
   } catch (e) {
-    log(`[MuninnSocket] Warning: Could not load extension.json: ${(e as Error).message}`);
+    log(`[KawaCodeSocket] Warning: Could not load extension.json: ${(e as Error).message}`);
     return null;
   }
 }
@@ -61,66 +61,66 @@ function loadUiBundle(manifest: Record<string, unknown> | null): string | null {
   try {
     return fs.readFileSync(bundlePath, 'utf-8');
   } catch (e) {
-    log(`[MuninnSocket] Warning: Could not load UI bundle at ${bundlePath}: ${(e as Error).message}`);
+    log(`[KawaCodeSocket] Warning: Could not load UI bundle at ${bundlePath}: ${(e as Error).message}`);
     return null;
   }
 }
 
 /**
- * Muninn's Tauri bundle identifier.
+ * Kawa Code's Tauri bundle identifier.
  *
- * Used on macOS to locate the App Sandbox container when Muninn is
+ * Used on macOS to locate the App Sandbox container when Kawa Code is
  * installed from the App Store. Third-party extension developers
- * should use this constant to discover the Muninn socket path.
+ * should use this constant to discover the Kawa Code socket path.
  */
-const MUNINN_BUNDLE_ID = 'com.codeawareness.muninn';
+const KAWA_CODE_BUNDLE_ID = 'com.codeawareness.muninn';
 
-export interface MuninnTransport {
+export interface KawaCodeTransport {
   readable: Readable;
   writable: Writable;
   close: () => void;
 }
 
 /**
- * Get the default Muninn socket path for the current platform.
+ * Get the default Kawa Code socket path for the current platform.
  *
  * On macOS, checks the App Sandbox container first (for App Store builds),
  * then falls back to the non-sandboxed path (for development builds).
  * Non-sandboxed processes CAN access files inside another app's container,
  * so third-party extensions work without special entitlements.
  */
-export function getDefaultMuninnSocketPath(): string {
+export function getDefaultKawaCodeSocketPath(): string {
   if (process.platform === 'win32') {
     return '\\\\.\\pipe\\muninn';
   }
   if (process.platform === 'darwin') {
-    // App Store (sandboxed) Muninn: socket may be inside the sandbox container
+    // App Store (sandboxed) Kawa Code: socket may be inside the sandbox container
     const containerSocketPath = path.join(
       os.homedir(),
-      'Library', 'Containers', MUNINN_BUNDLE_ID, 'Data',
+      'Library', 'Containers', KAWA_CODE_BUNDLE_ID, 'Data',
       'Library', 'Application Support', 'Kawa Code', 'sockets', 'muninn'
     );
     if (fs.existsSync(containerSocketPath)) {
-      log(`[MuninnSocket] Found sandbox socket at ${containerSocketPath}`);
+      log(`[KawaCodeSocket] Found sandbox socket at ${containerSocketPath}`);
       return containerSocketPath;
     }
   }
   // All platforms (incl. macOS dev/brew): ~/.kawa-code/sockets/muninn
-  // Matches Muninn's paths.rs: sockets_dir().join("muninn")
+  // Matches Kawa Code's paths.rs: sockets_dir().join("muninn")
   return path.join(os.homedir(), '.kawa-code', 'sockets', 'muninn');
 }
 
 /**
- * Connect to Muninn's Huginn socket as an extension client.
+ * Connect to Kawa Code's Huginn socket as an extension client.
  *
  * Sends an extension handshake with clientType: "extension" and
  * the extension's domain subscriptions. Returns a transport object
  * with readable/writable streams that can be used in place of
  * stdin/stdout.
  */
-export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
+export function connectToKawaCode(socketPath: string): Promise<KawaCodeTransport> {
   return new Promise((resolve, reject) => {
-    log(`[MuninnSocket] Connecting to Muninn catalog at ${socketPath}...`);
+    log(`[KawaCodeSocket] Connecting to Kawa Code catalog at ${socketPath}...`);
 
     // Pre-load manifest and UI bundle before connecting
     const manifest = loadExtensionManifest();
@@ -134,7 +134,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
     let activeSocket: net.Socket | null = null;
 
     // The writable stream for the extension to write to (replaces stdout)
-    // Messages written here go directly to Muninn via the active socket
+    // Messages written here go directly to Kawa Code via the active socket
     const writable = new PassThrough();
     writable.on('data', (chunk: Buffer) => {
       if (!activeSocket) return;
@@ -153,7 +153,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
     let buffer = '';
 
     const catalogSocket = net.createConnection(socketPath, () => {
-      log(`[MuninnSocket] Connected to Muninn catalog socket`);
+      log(`[KawaCodeSocket] Connected to Kawa Code catalog socket`);
 
       // Build handshake data with manifest + UI bundle for self-registration.
       // On Windows the catalog pipe uses a 4KB read buffer so only send the
@@ -167,12 +167,12 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
 
       if (manifest) {
         handshakeData.manifest = manifest;
-        log(`[MuninnSocket] Including manifest in handshake (${JSON.stringify(manifest).length} bytes)`);
+        log(`[KawaCodeSocket] Including manifest in handshake (${JSON.stringify(manifest).length} bytes)`);
       }
 
       if (uiBundle) {
         handshakeData.uiBundle = uiBundle;
-        log(`[MuninnSocket] Including UI bundle in handshake (${uiBundle.length} bytes)`);
+        log(`[KawaCodeSocket] Including UI bundle in handshake (${uiBundle.length} bytes)`);
       }
 
       const handshake = JSON.stringify({
@@ -182,7 +182,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
       });
 
       catalogSocket.write(handshake + '\n');
-      log(`[MuninnSocket] Sent extension handshake`);
+      log(`[KawaCodeSocket] Sent extension handshake`);
     });
 
     catalogSocket.on('data', (data: Buffer) => {
@@ -199,7 +199,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
             const msg = JSON.parse(line);
             if (msg.domain === 'system' && msg.action === 'handshake') {
               handshakeReceived = true;
-              log(`[MuninnSocket] Handshake complete: caw=${msg.data?.caw}, extensionId=${msg.data?.extensionId}`);
+              log(`[KawaCodeSocket] Handshake complete: caw=${msg.data?.caw}, extensionId=${msg.data?.extensionId}`);
 
               const pipePath: string | undefined = msg.data?.pipePath;
 
@@ -207,7 +207,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
                 // Windows two-pipe protocol: catalog pipe only handles registration.
                 // Connect to the dedicated client pipe for bidirectional I/O.
                 switchedToClientPipe = true;
-                log(`[MuninnSocket] Switching to client pipe: ${pipePath}`);
+                log(`[KawaCodeSocket] Switching to client pipe: ${pipePath}`);
                 catalogSocket.destroy();
                 setTimeout(() => {
                   connectClientPipe(pipePath, readable, writable, activeSocket, resolve, reject,
@@ -216,7 +216,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
               } else {
                 // Unix: single persistent connection
                 activeSocket = catalogSocket;
-                const transport: MuninnTransport = {
+                const transport: KawaCodeTransport = {
                   readable,
                   writable,
                   close: () => { catalogSocket.destroy(); },
@@ -236,9 +236,9 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
     });
 
     catalogSocket.on('error', (err: Error) => {
-      log(`[MuninnSocket] Catalog socket error: ${err.message}`);
+      log(`[KawaCodeSocket] Catalog socket error: ${err.message}`);
       if (!handshakeReceived) {
-        reject(new Error(`Failed to connect to Muninn: ${err.message}`));
+        reject(new Error(`Failed to connect to Kawa Code: ${err.message}`));
       }
     });
 
@@ -246,7 +246,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
       // On Windows the catalog pipe closes after handshake — expected, skip EOF.
       // On Unix the catalog socket IS the transport, so closing means EOF.
       if (!switchedToClientPipe) {
-        log(`[MuninnSocket] Socket closed`);
+        log(`[KawaCodeSocket] Socket closed`);
         readable.push(null); // Signal EOF
       }
     });
@@ -255,7 +255,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
     setTimeout(() => {
       if (!handshakeReceived) {
         catalogSocket.destroy();
-        reject(new Error('Muninn handshake timeout (10s)'));
+        reject(new Error('Kawa Code handshake timeout (10s)'));
       }
     }, 10000);
   });
@@ -263,7 +263,7 @@ export function connectToMuninn(socketPath: string): Promise<MuninnTransport> {
 
 /**
  * Connect to the dedicated client pipe returned in the Windows handshake.
- * On Windows, Muninn creates a per-client named pipe (\\.\pipe\caw.<id>)
+ * On Windows, Kawa Code creates a per-client named pipe (\\.\pipe\caw.<id>)
  * for bidirectional communication after the catalog registration.
  */
 function connectClientPipe(
@@ -271,18 +271,18 @@ function connectClientPipe(
   readable: PassThrough,
   writable: PassThrough,
   _activeSocket: net.Socket | null,
-  resolve: (transport: MuninnTransport) => void,
+  resolve: (transport: KawaCodeTransport) => void,
   reject: (err: Error) => void,
   setActiveSocket: (sock: net.Socket) => void,
 ): void {
-  log(`[MuninnSocket] Connecting to client pipe: ${pipePath}`);
+  log(`[KawaCodeSocket] Connecting to client pipe: ${pipePath}`);
 
   let buffer = '';
   const clientSocket = net.createConnection(pipePath, () => {
-    log(`[MuninnSocket] Client pipe connected`);
+    log(`[KawaCodeSocket] Client pipe connected`);
     setActiveSocket(clientSocket);
 
-    const transport: MuninnTransport = {
+    const transport: KawaCodeTransport = {
       readable,
       writable,
       close: () => { clientSocket.destroy(); },
@@ -301,12 +301,12 @@ function connectClientPipe(
   });
 
   clientSocket.on('error', (err: Error) => {
-    log(`[MuninnSocket] Client pipe error: ${err.message}`);
-    reject(new Error(`Failed to connect to Muninn client pipe: ${err.message}`));
+    log(`[KawaCodeSocket] Client pipe error: ${err.message}`);
+    reject(new Error(`Failed to connect to Kawa Code client pipe: ${err.message}`));
   });
 
   clientSocket.on('close', () => {
-    log(`[MuninnSocket] Client pipe closed`);
+    log(`[KawaCodeSocket] Client pipe closed`);
     readable.push(null); // Signal EOF
   });
 }

@@ -23,14 +23,14 @@ Extensions register domains they want to handle in `extension.json`:
 }
 ```
 
-Muninn builds a **routing table** from all registered extensions:
+Kawa Code builds a **routing table** from all registered extensions:
 
 ```
 code               → gardener
 repo               → gardener
 auth               → gardener
 i18n               → i18n-extension
-extension-progress → [Muninn UI Progress Handler]
+extension-progress → [Kawa Code UI Progress Handler]
 *                  → [all extensions] (broadcast)
 ```
 
@@ -39,7 +39,7 @@ extension-progress → [Muninn UI Progress Handler]
 The i18n extension uses **TWO domains**:
 
 #### Domain 1: `i18n` (Request Handling)
-- **Purpose**: Handle incoming requests from VSCode/Muninn
+- **Purpose**: Handle incoming requests from VSCode/Kawa Code
 - **Flow**: `req` → `res` or `err`
 - **Registration**: Listed in `domains.subscribe` in manifest
 - **Examples**: translate-code, load-dictionary, add-terms
@@ -65,18 +65,18 @@ The i18n extension uses **TWO domains**:
 ```
 
 #### Domain 2: `extension-progress` (Progress Broadcasting)
-- **Purpose**: Send progress updates to Muninn UI
+- **Purpose**: Send progress updates to Kawa Code UI
 - **Flow**: `brdc` (broadcast, no response expected)
-- **Registration**: Built-in Muninn handler, no registration needed
+- **Registration**: Built-in Kawa Code handler, no registration needed
 - **Examples**: Task started, progress updates, completion
 
 ```typescript
 // Broadcast from i18n extension
 {
   flow: 'brdc',
-  domain: 'extension-progress',  // Routes to Muninn UI progress handler
+  domain: 'extension-progress',  // Routes to Kawa Code UI progress handler
   action: 'started' | 'progress' | 'complete' | 'error',
-  caw: '0',                       // Always '0' for Muninn
+  caw: '0',                       // Always '0' for Kawa Code
   data: {
     extensionId: 'i18n',          // Identifies which extension
     taskId: string,               // Unique task ID
@@ -110,14 +110,14 @@ The i18n extension uses **TWO domains**:
 
 **Key Points**:
 - `domains.subscribe` lists domains this extension **handles**
-- When Muninn receives a message with `domain: 'i18n'`, it routes to this extension
-- The `extension-progress` domain is a **built-in Muninn handler** - no registration needed
+- When Kawa Code receives a message with `domain: 'i18n'`, it routes to this extension
+- The `extension-progress` domain is a **built-in Kawa Code handler** - no registration needed
 
 ---
 
-### Step 2: Muninn Builds Routing Table
+### Step 2: Kawa Code Builds Routing Table
 
-When Muninn starts:
+When Kawa Code starts:
 1. Scans `~/.kawa-code/extensions/` directory
 2. Reads each `extension.json` manifest
 3. Builds routing table from `domains.subscribe` arrays
@@ -126,11 +126,11 @@ When Muninn starts:
 **Routing Table Example**:
 ```
 i18n               → i18n extension binary
-extension-progress → Muninn UI Progress Handler (built-in)
+extension-progress → Kawa Code UI Progress Handler (built-in)
 gardener           → gardener sidecar (built-in)
 ```
 
-**Result**: When a message arrives with `domain: 'i18n'`, Muninn routes it to the i18n extension.
+**Result**: When a message arrives with `domain: 'i18n'`, Kawa Code routes it to the i18n extension.
 
 ---
 
@@ -162,7 +162,7 @@ async function handleMessage(message: IPCMessage): Promise<void> {
 
 **File**: `src/ipc/protocol.ts`
 
-While processing a request, the extension broadcasts progress to Muninn UI:
+While processing a request, the extension broadcasts progress to Kawa Code UI:
 
 ```typescript
 export function sendProgress(
@@ -178,7 +178,7 @@ export function sendProgress(
 ): void {
   const message = {
     flow: 'brdc',
-    domain: 'extension-progress',  // Routes to Muninn UI Progress Handler
+    domain: 'extension-progress',  // Routes to Kawa Code UI Progress Handler
     action,
     caw: '0',
     data: {
@@ -195,23 +195,23 @@ export function sendProgress(
 
 ---
 
-### Step 5: Muninn Routes Messages
+### Step 5: Kawa Code Routes Messages
 
-**Muninn IPC Router** (Rust → Extension or UI)
+**Kawa Code IPC Router** (Rust → Extension or UI)
 
 #### For Request Messages (`domain: 'i18n'`):
-1. Muninn receives message from VSCode with `domain: 'i18n'`
+1. Kawa Code receives message from VSCode with `domain: 'i18n'`
 2. Looks up routing table: `i18n → i18n extension`
 3. Routes message to i18n extension via STDIN
 4. Extension processes and sends response
-5. Muninn routes response back to VSCode
+5. Kawa Code routes response back to VSCode
 
 #### For Broadcast Messages (`domain: 'extension-progress'`):
 1. Extension sends broadcast via STDOUT with `domain: 'extension-progress'`
-2. Muninn sees `domain: 'extension-progress'`
+2. Kawa Code sees `domain: 'extension-progress'`
 3. Routes to **Progress Store** (Vue.js UI component)
 4. **Progress Store** identifies extension by `extensionId: 'i18n'`
-5. **Progress UI Component** displays notification in Muninn UI
+5. **Progress UI Component** displays notification in Kawa Code UI
 
 ---
 
@@ -229,7 +229,7 @@ export function sendProgress(
        │    flow: 'req'
        ↓
 ┌──────────────────┐
-│ Muninn IPC Router│
+│ Kawa Code IPC Router│
 └────────┬─────────┘
          │ 2. Routing table lookup
          │    'i18n' → i18n extension
@@ -244,7 +244,7 @@ export function sendProgress(
          │    flow: 'res'
          ↓
 ┌──────────────────┐
-│ Muninn IPC Router│
+│ Kawa Code IPC Router│
 └────────┬─────────┘
          │ 5. Route response back
          ↓
@@ -253,7 +253,7 @@ export function sendProgress(
 └─────────────┘
 ```
 
-### Flow 2: i18n Extension → Muninn UI (Domain: `extension-progress`)
+### Flow 2: i18n Extension → Kawa Code UI (Domain: `extension-progress`)
 
 ```
 ┌──────────────────┐
@@ -271,7 +271,7 @@ export function sendProgress(
          │    }
          ↓
 ┌──────────────────┐
-│ Muninn IPC Router│
+│ Kawa Code IPC Router│
 └────────┬─────────┘
          │ 2. Routing table lookup
          │    'extension-progress' → UI Progress Handler
@@ -301,7 +301,7 @@ export function sendProgress(
 
 ### 1. **Domain-Based Routing**
 - Clear separation of concerns: each extension owns its domain
-- Muninn automatically routes messages based on domain
+- Kawa Code automatically routes messages based on domain
 - No collision between extensions (each has unique domain)
 
 ### 2. **Dual Domain Pattern**
@@ -311,13 +311,13 @@ export function sendProgress(
 
 ### 3. **Explicit Registration**
 - `domains.subscribe` clearly declares what the extension handles
-- Muninn builds routing table at startup
+- Kawa Code builds routing table at startup
 - Easy to see which extension handles which domain
 
 ### 4. **Universal Progress UI**
 - All extensions use same `extension-progress` domain for progress
 - Consistent user experience across all extensions
-- Muninn provides generic UI - no custom progress handlers needed
+- Kawa Code provides generic UI - no custom progress handlers needed
 
 ### 5. **Extension Isolation**
 - Each extension has dedicated domain (`i18n`, `linter`, `formatter`)
@@ -336,8 +336,8 @@ export function sendProgress(
 ### ❌ WITHOUT Domain Registration (Hypothetical)
 
 ```typescript
-// Extension would need to manually hook into Muninn
-Muninn.registerHandlers({
+// Extension would need to manually hook into Kawa Code
+Kawa Code.registerHandlers({
   extensionId: 'i18n',
   handlers: {
     'translate-code': handleTranslateCode,
@@ -345,7 +345,7 @@ Muninn.registerHandlers({
   }
 });
 
-// Muninn would need to know about every extension
+// Kawa Code would need to know about every extension
 if (extensionId === 'i18n') {
   callI18nHandler();
 } else if (extensionId === 'linter') {
@@ -354,8 +354,8 @@ if (extensionId === 'i18n') {
 ```
 
 **Problems**:
-- Tight coupling between Muninn and extensions
-- Muninn needs code for each extension
+- Tight coupling between Kawa Code and extensions
+- Kawa Code needs code for each extension
 - Hard to add new extensions
 - No clear separation of concerns
 
@@ -385,7 +385,7 @@ async function handleMessage(message: IPCMessage): Promise<void> {
 }
 ```
 
-**Muninn Code**:
+**Kawa Code Code**:
 ```rust
 // Generic routing - no extension-specific code
 fn route_message(message: IPCMessage) {
@@ -396,7 +396,7 @@ fn route_message(message: IPCMessage) {
 
 **Advantages**:
 - Declarative domain registration via manifest
-- Zero coupling - Muninn doesn't know about specific extensions
+- Zero coupling - Kawa Code doesn't know about specific extensions
 - Generic routing logic works for all extensions
 - Easy to add new extensions - just add manifest entry
 
@@ -407,7 +407,7 @@ fn route_message(message: IPCMessage) {
 ### 1. **Extension Startup**
 
 ```
-Muninn starts
+Kawa Code starts
   ↓
 Discovers i18n extension
   ↓
@@ -430,7 +430,7 @@ VSCode sends: {
   action: 'translate-code'
 }
   ↓
-Muninn routes to i18n extension (by domain)
+Kawa Code routes to i18n extension (by domain)
   ↓
 Extension receives request
   ↓
@@ -440,7 +440,7 @@ Extension sends: {
   data: { extensionId: 'i18n', ... }
 }
   ↓
-Muninn displays progress UI
+Kawa Code displays progress UI
   ↓
 Extension processes request
   ↓
@@ -525,7 +525,7 @@ sendProgress(taskId, 'Code Translation', 'complete', {
 });
 ```
 
-**Result**: Muninn shows a progress dialog that updates in real-time and auto-closes after 3 seconds.
+**Result**: Kawa Code shows a progress dialog that updates in real-time and auto-closes after 3 seconds.
 
 ---
 
@@ -534,8 +534,8 @@ sendProgress(taskId, 'Code Translation', 'complete', {
 ### How Domain Registration Works
 
 1. **Declare Domains**: Extensions list domains in `extension.json` under `domains.subscribe`
-2. **Muninn Builds Routing Table**: At startup, scans all manifests and creates routing map
-3. **Generic Routing**: Muninn routes all messages based on `domain` field
+2. **Kawa Code Builds Routing Table**: At startup, scans all manifests and creates routing map
+3. **Generic Routing**: Kawa Code routes all messages based on `domain` field
 4. **Extension Handles**: Extension receives messages on its domain(s) via STDIN
 5. **Dual Domain Pattern**: Custom domain for requests + `extension-progress` for UI updates
 
@@ -552,15 +552,15 @@ sendProgress(taskId, 'Code Translation', 'complete', {
 - ✅ Include `extensionId: 'i18n'` in data to identify your extension
 - ✅ Follow standard message structure
 - ✅ Use predefined `action` types: started, progress, complete, error
-- ✅ Muninn's generic UI handles display automatically
+- ✅ Kawa Code's generic UI handles display automatically
 
 ### Architecture Principles
 
 1. **Separation of Concerns**: Each extension owns its domain
 2. **Explicit Registration**: Manifest declares capabilities upfront
-3. **Generic Routing**: Muninn knows nothing about specific extensions
+3. **Generic Routing**: Kawa Code knows nothing about specific extensions
 4. **Universal UI**: Standard progress protocol for consistent UX
-5. **Zero Coupling**: Extensions independent from Muninn core
+5. **Zero Coupling**: Extensions independent from Kawa Code core
 
 ### Reference
 
@@ -574,6 +574,6 @@ sendProgress(taskId, 'Code Translation', 'complete', {
 
 **The beauty of this design**:
 - Extensions declare domains once in manifest
-- Muninn routes automatically via generic logic
+- Kawa Code routes automatically via generic logic
 - Zero coupling between extensions and core
 - Universal progress UI provides consistent UX

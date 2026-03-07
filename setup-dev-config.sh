@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sets up kawa.i18n extension for development with Muninn
+# Sets up kawa.i18n extension for development with Kawa Code
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KAWA_DIR="$HOME/.kawa-code"
@@ -33,4 +33,4 @@ echo "Now run:"
 echo "  1. Terminal 1: cd ../kawa.gardener && yarn dev"
 echo "  2. Terminal 2: cd ../kawa.muninn && ./debug.sh"
 echo ""
-echo "Muninn will auto-discover and load the i18n extension!"
+echo "Kawa Code will auto-discover and load the i18n extension!"

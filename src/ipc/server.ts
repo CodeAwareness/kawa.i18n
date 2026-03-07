@@ -2,7 +2,7 @@
  * Direct IPC Server for Huginn Clients
  *
  * Accepts connections from editor extensions (VSCode, Emacs, Vim)
- * for direct translation requests, bypassing Muninn for the hot path.
+ * for direct translation requests, bypassing Kawa Code for the hot path.
  *
  * Socket location:
  * - Unix/macOS: ~/.kawa-code/sockets/kawa.i18n
@@ -34,28 +34,28 @@ const langByCAW = new Map<string, string>();
 type DirectRequestHandler = (message: IPCMessage, caw: string) => Promise<any>;
 const directHandlers = new Map<string, DirectRequestHandler>();
 
-// Pending Muninn requests for correlation
-const pendingMuninnRequests = new Map<string, {
+// Pending Kawa Code requests for correlation
+const pendingKawaCodeRequests = new Map<string, {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
 }>();
 
-let muninnRequestCounter = 0;
+let kawaCodeRequestCounter = 0;
 
 /**
- * Send a request to Muninn via stdout and wait for response
+ * Send a request to Kawa Code via stdout and wait for response
  */
-export async function requestFromMuninn(message: Omit<IPCMessage, '_msgId'>): Promise<any> {
+export async function requestFromKawaCode(message: Omit<IPCMessage, '_msgId'>): Promise<any> {
   return new Promise((resolve, reject) => {
-    const msgId = `direct-${++muninnRequestCounter}-${Date.now()}`;
+    const msgId = `direct-${++kawaCodeRequestCounter}-${Date.now()}`;
 
     const timeout = setTimeout(() => {
-      pendingMuninnRequests.delete(msgId);
-      reject(new Error(`Muninn request timeout: ${message.domain}:${message.action}`));
+      pendingKawaCodeRequests.delete(msgId);
+      reject(new Error(`Kawa Code request timeout: ${message.domain}:${message.action}`));
     }, 10000);
 
-    pendingMuninnRequests.set(msgId, { resolve, reject, timeout });
+    pendingKawaCodeRequests.set(msgId, { resolve, reject, timeout });
 
     const fullMessage: IPCMessage = {
       ...message,
@@ -63,25 +63,25 @@ export async function requestFromMuninn(message: Omit<IPCMessage, '_msgId'>): Pr
     } as IPCMessage;
 
     process.stdout.write(`MUNINN START:0 ${JSON.stringify(fullMessage)}\n`);
-    log(`[DirectIPC] Sent request to Muninn: ${message.domain}:${message.action} (${msgId})`);
+    log(`[DirectIPC] Sent request to Kawa Code: ${message.domain}:${message.action} (${msgId})`);
   });
 }
 
 /**
- * Handle response from Muninn (called from stdin handler)
+ * Handle response from Kawa Code (called from stdin handler)
  */
-export function handleMuninnResponse(message: IPCMessage): boolean {
+export function handleKawaCodeResponse(message: IPCMessage): boolean {
   const msgId = message._msgId;
-  if (!msgId || !pendingMuninnRequests.has(msgId)) {
+  if (!msgId || !pendingKawaCodeRequests.has(msgId)) {
     return false; // Not a response to our request
   }
 
-  const pending = pendingMuninnRequests.get(msgId)!;
-  pendingMuninnRequests.delete(msgId);
+  const pending = pendingKawaCodeRequests.get(msgId)!;
+  pendingKawaCodeRequests.delete(msgId);
   clearTimeout(pending.timeout);
 
   if (message.flow === 'err') {
-    pending.reject(new Error(message.data?.error || 'Muninn request failed'));
+    pending.reject(new Error(message.data?.error || 'Kawa Code request failed'));
   } else {
     pending.resolve(message.data);
   }
@@ -118,12 +118,12 @@ export function setLanguage(caw: string, lang: string): void {
 }
 
 /**
- * Get origin for a file path from Muninn
+ * Get origin for a file path from Kawa Code
  */
 export async function getOriginForPath(fpath: string): Promise<{ origin: string; projectRoot: string } | null> {
   try {
-    log(`[DirectIPC] Querying Muninn for origin: ${fpath}`);
-    const response = await requestFromMuninn({
+    log(`[DirectIPC] Querying Kawa Code for origin: ${fpath}`);
+    const response = await requestFromKawaCode({
       flow: 'req',
       domain: 'repo',
       action: 'get-origin',
@@ -135,10 +135,10 @@ export async function getOriginForPath(fpath: string): Promise<{ origin: string;
       return { origin: response.origin, projectRoot: response.projectRoot };
     }
 
-    log(`[DirectIPC] No origin returned from Muninn for ${fpath}`);
+    log(`[DirectIPC] No origin returned from Kawa Code for ${fpath}`);
     return null;
   } catch (error: any) {
-    log(`[DirectIPC] Failed to get origin from Muninn: ${error.message}`);
+    log(`[DirectIPC] Failed to get origin from Kawa Code: ${error.message}`);
     return null;
   }
 }

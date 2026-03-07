@@ -296,10 +296,10 @@ Translation scope settings are stored separately in `~/.kawa-code/i18n/settings.
 
 ## Development
 
-Run `npm run dev` (or `yarn dev`) from the repo root — the extension automatically connects to a running Muninn instance on startup. No symlinks or manual installation steps are needed for development.
+Run `npm run dev` (or `yarn dev`) from the repo root — the extension automatically connects to a running Kawa Code instance on startup. No symlinks or manual installation steps are needed for development.
 
 ```bash
-# Run in dev mode (auto-connects to Muninn)
+# Run in dev mode (auto-connects to Kawa Code)
 npm run dev
 
 # Watch mode
