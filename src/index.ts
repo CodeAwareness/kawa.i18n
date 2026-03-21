@@ -16,6 +16,8 @@ import {
   startDirectServer,
   registerDirectHandler,
   handleKawaCodeResponse,
+  requestFromKawaCode,
+  setExtensionCaw,
   getLanguage,
   setLanguage,
   getOriginForPath
@@ -1817,6 +1819,28 @@ async function handleDirectGetLanguage(message: IPCMessage, caw: string): Promis
 /**
  * Main entry point
  */
+/**
+ * Request current auth state from Kawa Code.
+ * Called after transport is established to ensure we have a valid token,
+ * since the startup auth broadcast may have been sent before we connected.
+ */
+async function requestAuthFromKawaCode(): Promise<void> {
+  try {
+    const response = await requestFromKawaCode({
+      flow: 'req',
+      domain: 'auth',
+      action: 'info',
+      caw: '', // overridden by requestFromKawaCode with the assigned extension caw
+      data: {},
+    });
+    if (response) {
+      setAuthState(response);
+    }
+  } catch (err: any) {
+    log(`[Warning] Failed to request auth from Kawa Code: ${err.message}`);
+  }
+}
+
 async function main() {
   log(`=== Kawa i18n Extension v${VERSION} ===`);
 
@@ -1880,8 +1904,10 @@ async function main() {
     try {
       const transport = await connectToKawaCode(muninnSocketPath);
       setTransport(transport.writable, 'socket');
+      setExtensionCaw(transport.caw);
       startListening(transport.readable);
       log('Running in socket mode (Kawa Code IPC client)');
+      await requestAuthFromKawaCode();
     } catch (err: any) {
       log(`[Fatal] Failed to connect to Kawa Code socket: ${err.message}`);
       process.exit(1);
@@ -1890,6 +1916,7 @@ async function main() {
     // Legacy stdin/stdout mode (spawned by Kawa Code)
     startListening();
     log('Running in stdin/stdout mode (spawned by Kawa Code)');
+    await requestAuthFromKawaCode();
 
     // Initialize stream buffers for large message support (stdin mode only)
     {
@@ -1919,8 +1946,10 @@ async function main() {
     try {
       const transport = await connectToKawaCode(defaultPath);
       setTransport(transport.writable, 'socket');
+      setExtensionCaw(transport.caw);
       startListening(transport.readable);
       log('Running in socket mode (auto-detected default path)');
+      await requestAuthFromKawaCode();
     } catch (err: any) {
       log(`[Fatal] Cannot start: no stdin pipe and no Kawa Code socket at ${defaultPath}: ${err.message}`);
       process.exit(1);

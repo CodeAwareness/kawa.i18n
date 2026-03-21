@@ -79,6 +79,8 @@ export interface KawaCodeTransport {
   readable: Readable;
   writable: Writable;
   close: () => void;
+  /** CAW ID assigned by Kawa Code during handshake (e.g., "extension-i18n-0") */
+  caw: string;
 }
 
 /**
@@ -209,9 +211,10 @@ export function connectToKawaCode(socketPath: string): Promise<KawaCodeTransport
                 switchedToClientPipe = true;
                 log(`[KawaCodeSocket] Switching to client pipe: ${pipePath}`);
                 catalogSocket.destroy();
+                const assignedCaw = msg.data?.caw || '0';
                 setTimeout(() => {
                   connectClientPipe(pipePath, readable, writable, activeSocket, resolve, reject,
-                    (sock) => { activeSocket = sock; });
+                    (sock) => { activeSocket = sock; }, assignedCaw);
                 }, 50);
               } else {
                 // Unix: single persistent connection
@@ -220,6 +223,7 @@ export function connectToKawaCode(socketPath: string): Promise<KawaCodeTransport
                   readable,
                   writable,
                   close: () => { catalogSocket.destroy(); },
+                  caw: msg.data?.caw || '0',
                 };
                 resolve(transport);
               }
@@ -274,6 +278,7 @@ function connectClientPipe(
   resolve: (transport: KawaCodeTransport) => void,
   reject: (err: Error) => void,
   setActiveSocket: (sock: net.Socket) => void,
+  assignedCaw: string = '0',
 ): void {
   log(`[KawaCodeSocket] Connecting to client pipe: ${pipePath}`);
 
@@ -286,6 +291,7 @@ function connectClientPipe(
       readable,
       writable,
       close: () => { clientSocket.destroy(); },
+      caw: assignedCaw,
     };
     resolve(transport);
   });

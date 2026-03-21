@@ -12,7 +12,7 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { log, IPCMessage } from './protocol';
+import { log, IPCMessage, sendRawMessage } from './protocol';
 
 const isWindows = os.platform() === 'win32';
 const isMacOS = os.platform() === 'darwin';
@@ -44,6 +44,17 @@ const pendingKawaCodeRequests = new Map<string, {
 let kawaCodeRequestCounter = 0;
 
 /**
+ * CAW ID assigned by Kawa Code during handshake (e.g., "extension-i18n-0").
+ * Used in requests so Muninn routes the Gardener response back to this extension.
+ */
+let extensionCaw = '0';
+
+export function setExtensionCaw(caw: string): void {
+  extensionCaw = caw;
+  log(`[DirectIPC] Extension caw set to: ${caw}`);
+}
+
+/**
  * Send a request to Kawa Code via stdout and wait for response
  */
 export async function requestFromKawaCode(message: Omit<IPCMessage, '_msgId'>): Promise<any> {
@@ -59,10 +70,11 @@ export async function requestFromKawaCode(message: Omit<IPCMessage, '_msgId'>): 
 
     const fullMessage: IPCMessage = {
       ...message,
+      caw: extensionCaw,
       _msgId: msgId
     } as IPCMessage;
 
-    process.stdout.write(`MUNINN START:0 ${JSON.stringify(fullMessage)}\n`);
+    sendRawMessage(fullMessage);
     log(`[DirectIPC] Sent request to Kawa Code: ${message.domain}:${message.action} (${msgId})`);
   });
 }

@@ -24,6 +24,7 @@ interface TranslationScope {
 }
 
 type TranslationPreset = 'quick' | 'comprehensive' | 'full' | 'custom'
+type TranslationMode = 'local' | 'api'
 
 // Preset definitions (markdownFiles is always false in presets - it's an independent opt-in)
 const PRESET_DEFINITIONS: Record<Exclude<TranslationPreset, 'custom'>, TranslationScope> = {
@@ -54,6 +55,11 @@ interface Translations {
   markdownFiles: string
   markdownFilesHint: string
   loading: string
+  translationProvider: string
+  providerLocal: string
+  providerLocalHint: string
+  providerCloud: string
+  providerCloudHint: string
 }
 
 const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
@@ -76,6 +82,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Markdown Files',
     markdownFilesHint: 'Translate README and documentation (.md files) during project scan',
     loading: 'Loading settings...',
+    translationProvider: 'Translation Provider',
+    providerLocal: 'Local',
+    providerLocalHint: 'Uses Claude CLI on your machine — code never leaves your device',
+    providerCloud: 'Cloud',
+    providerCloudHint: 'Uses Kawa API — requires no local setup, but code is sent to the server',
   },
   ja: {
     description: 'コードを希望の言語で表示する際に翻訳される内容を制御します。',
@@ -96,6 +107,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Markdownファイル',
     markdownFilesHint: 'プロジェクトスキャン時にREADMEやドキュメント（.mdファイル）を翻訳',
     loading: '設定を読み込み中...',
+    translationProvider: '翻訳プロバイダー',
+    providerLocal: 'ローカル',
+    providerLocalHint: 'マシン上のClaude CLIを使用 — コードはデバイスから送信されません',
+    providerCloud: 'クラウド',
+    providerCloudHint: 'Kawa APIを使用 — ローカル設定不要、コードはサーバーに送信されます',
   },
   de: {
     description: 'Steuern Sie, was übersetzt wird, wenn Sie Code in Ihrer bevorzugten Sprache anzeigen.',
@@ -116,6 +132,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Markdown-Dateien',
     markdownFilesHint: 'README und Dokumentation (.md-Dateien) beim Projekt-Scan übersetzen',
     loading: 'Einstellungen werden geladen...',
+    translationProvider: 'Übersetzungsanbieter',
+    providerLocal: 'Lokal',
+    providerLocalHint: 'Verwendet Claude CLI auf Ihrem Gerät — Code verlässt Ihr Gerät nicht',
+    providerCloud: 'Cloud',
+    providerCloudHint: 'Verwendet Kawa API — keine lokale Einrichtung nötig, Code wird an den Server gesendet',
   },
   he: {
     description: 'שלוט במה שמתורגם בעת צפייה בקוד בשפה המועדפת עליך.',
@@ -136,6 +157,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'קבצי Markdown',
     markdownFilesHint: 'תרגם README ותיעוד (קבצי .md) בסריקת פרויקט',
     loading: 'טוען הגדרות...',
+    translationProvider: 'ספק תרגום',
+    providerLocal: 'מקומי',
+    providerLocalHint: 'משתמש ב-Claude CLI במכשיר שלך — הקוד לא עוזב את המכשיר',
+    providerCloud: 'ענן',
+    providerCloudHint: 'משתמש ב-Kawa API — ללא הגדרה מקומית, הקוד נשלח לשרת',
   },
   zh: {
     description: '控制以首选语言查看代码时翻译的内容。',
@@ -156,6 +182,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Markdown 文件',
     markdownFilesHint: '在项目扫描时翻译 README 和文档（.md 文件）',
     loading: '正在加载设置...',
+    translationProvider: '翻译提供者',
+    providerLocal: '本地',
+    providerLocalHint: '使用设备上的 Claude CLI — 代码不会离开您的设备',
+    providerCloud: '云端',
+    providerCloudHint: '使用 Kawa API — 无需本地设置，代码将发送至服务器',
   },
   ko: {
     description: '선호하는 언어로 코드를 볼 때 번역되는 내용을 제어합니다.',
@@ -176,6 +207,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Markdown 파일',
     markdownFilesHint: '프로젝트 스캔 시 README 및 문서(.md 파일) 번역',
     loading: '설정 로드 중...',
+    translationProvider: '번역 제공자',
+    providerLocal: '로컬',
+    providerLocalHint: '기기의 Claude CLI를 사용 — 코드가 기기를 떠나지 않습니다',
+    providerCloud: '클라우드',
+    providerCloudHint: 'Kawa API를 사용 — 로컬 설정 불필요, 코드가 서버로 전송됩니다',
   },
   ru: {
     description: 'Управляйте тем, что переводится при просмотре кода на предпочитаемом языке.',
@@ -196,6 +232,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'Файлы Markdown',
     markdownFilesHint: 'Переводить README и документацию (.md файлы) при сканировании проекта',
     loading: 'Загрузка настроек...',
+    translationProvider: 'Поставщик перевода',
+    providerLocal: 'Локальный',
+    providerLocalHint: 'Использует Claude CLI на вашем устройстве — код не покидает устройство',
+    providerCloud: 'Облако',
+    providerCloudHint: 'Использует Kawa API — не требует локальной настройки, код отправляется на сервер',
   },
   ar: {
     description: 'تحكم فيما يتم ترجمته عند عرض الكود بلغتك المفضلة.',
@@ -216,6 +257,11 @@ const TRANSLATIONS: Record<SupportedLanguage, Translations> = {
     markdownFiles: 'ملفات Markdown',
     markdownFilesHint: 'ترجمة README والتوثيق (ملفات .md) أثناء فحص المشروع',
     loading: 'جارٍ تحميل الإعدادات...',
+    translationProvider: 'مزود الترجمة',
+    providerLocal: 'محلي',
+    providerLocalHint: 'يستخدم Claude CLI على جهازك — الكود لا يغادر جهازك',
+    providerCloud: 'سحابي',
+    providerCloudHint: 'يستخدم Kawa API — لا حاجة لإعداد محلي، يتم إرسال الكود إلى الخادم',
   },
 }
 
@@ -296,6 +342,54 @@ export class I18nSettings extends LitElement {
       background: var(--primary-color, #6366f1);
       border-color: var(--primary-color, #6366f1);
       color: white;
+    }
+
+    .provider-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .provider-options {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .provider-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid var(--surface-border, #3f3f3f);
+      border-radius: 4px;
+      background: var(--surface-card, #2a2a2a);
+      color: var(--text-color, #e0e0e0);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .provider-btn:hover {
+      background: var(--surface-hover, #3a3a3a);
+      border-color: var(--primary-color, #6366f1);
+    }
+
+    .provider-btn.active {
+      border-color: var(--primary-color, #6366f1);
+      background: var(--surface-hover, #3a3a3a);
+    }
+
+    .provider-icon {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .provider-hint {
+      font-size: 0.75rem;
+      color: var(--text-color-secondary, #a0a0a0);
+      line-height: 1.3;
     }
 
     .scope-section {
@@ -418,6 +512,9 @@ export class I18nSettings extends LitElement {
   private saving = false
 
   @state()
+  private translationMode: TranslationMode = 'local'
+
+  @state()
   private uiLang: SupportedLanguage = 'en'
 
   private boundLanguageHandler = this.handleLanguageChange.bind(this)
@@ -464,6 +561,9 @@ export class I18nSettings extends LitElement {
           markdownFiles: response.translationScope.markdownFiles ?? false,
         }
       }
+      if (response?.translationMode) {
+        this.translationMode = response.translationMode
+      }
     } catch (e) {
       console.error('[i18n-settings] Failed to load settings:', e)
       // Use defaults on error
@@ -498,6 +598,22 @@ export class I18nSettings extends LitElement {
     this.saveSettings()
   }
 
+  private async onModeChange(mode: TranslationMode) {
+    if (mode === this.translationMode) return
+    this.translationMode = mode
+    try {
+      this.saving = true
+      await sendIPCRequest(this, 'i18n', 'set-translation-mode', {
+        translationMode: mode
+      })
+    } catch (e) {
+      console.error('[i18n-settings] Failed to save translation mode:', e)
+      this.error = 'Failed to save translation mode'
+    } finally {
+      this.saving = false
+    }
+  }
+
   private get activePreset(): TranslationPreset {
     return scopeToPreset(this.scope)
   }
@@ -519,6 +635,28 @@ export class I18nSettings extends LitElement {
         <p class="description">
           ${this.t.description}
         </p>
+
+        <div class="provider-section">
+          <span class="section-label">${this.t.translationProvider}</span>
+          <div class="provider-options">
+            <button
+              class="provider-btn ${this.translationMode === 'local' ? 'active' : ''}"
+              @click=${() => this.onModeChange('local')}
+              ?disabled=${this.saving}
+            >
+              <span class="provider-icon">${this.translationMode === 'local' ? '\u2713 ' : ''}${this.t.providerLocal}</span>
+              <span class="provider-hint">${this.t.providerLocalHint}</span>
+            </button>
+            <button
+              class="provider-btn ${this.translationMode === 'api' ? 'active' : ''}"
+              @click=${() => this.onModeChange('api')}
+              ?disabled=${this.saving}
+            >
+              <span class="provider-icon">${this.translationMode === 'api' ? '\u2713 ' : ''}${this.t.providerCloud}</span>
+              <span class="provider-hint">${this.t.providerCloudHint}</span>
+            </button>
+          </div>
+        </div>
 
         <div class="preset-section">
           <span class="section-label">${this.t.preset}</span>

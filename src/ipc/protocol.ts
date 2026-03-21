@@ -182,6 +182,14 @@ export function sendProgress(
 }
 
 /**
+ * Send a raw IPC message via the current transport.
+ * Used by requestFromKawaCode to send requests through the correct output channel.
+ */
+export function sendRawMessage(message: IPCMessage): void {
+  writeMessage(JSON.stringify(message));
+}
+
+/**
  * Flush stdout so the last progress message (e.g. complete) is delivered to Kawa Code
  * before the handler returns. Call after sendProgress(..., 'complete', ...).
  */

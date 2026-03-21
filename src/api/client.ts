@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { Dictionary, LanguageCode } from '../core/types';
 import { getAccessToken } from '../auth/store';
 
-const API_BASE_URL = process.env.KAWA_API_URL || 'https://api.codeawareness.com';
+const API_BASE_URL = process.env.KAWA_API_URL || 'https://api.kawacode.ai';
 
 export interface APIResponse<T> {
   success: boolean;
