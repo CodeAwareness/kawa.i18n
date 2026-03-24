@@ -21,6 +21,22 @@ Kawa i18n allows developers to view code in their native language, speeding up c
 - **Intent Translation**: Translates intent titles and descriptions for the Kawa collaboration layer
 - **IDE-Friendly**: Keywords stay in English for full tooling compatibility
 
+## What This Extension Adds
+
+Kawa Code has a **built-in language switcher** in the top menu that changes the app's UI language (menu labels, buttons, form fields) without any extensions. This works out of the box for English, Japanese, German, and Hebrew.
+
+The i18n extension adds **code-level translation** on top of that:
+
+| Feature | Without i18n extension | With i18n extension |
+|---------|----------------------|---------------------|
+| App UI language (menus, buttons) | Changes immediately | Changes immediately |
+| Intent titles/descriptions | Shown in original language | Translated to your language |
+| Code identifiers (variable/function names) | English only | Translated in code viewer |
+| Code comments | English only | Translated in code viewer |
+| Project dictionary (shared with team) | Not available | Built and synced automatically |
+
+When the i18n extension is not active, Kawa Code gracefully falls back to displaying all content in its original language — no errors or spinners.
+
 ## Architecture
 
 ```

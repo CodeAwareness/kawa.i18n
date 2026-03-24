@@ -5,13 +5,31 @@
  * Uses English as pivot language for multilingual teams.
  */
 
-import { IPCMessage, log } from '../ipc/protocol';
+import { EventEmitter } from 'events';
+import { IPCMessage, log, sendProgress } from '../ipc/protocol';
 import { requestFromKawaCode, getLanguage } from '../ipc/server';
 import { intentCacheManager, blockContentCacheManager } from './cache';
 import {
-  translateText as localTranslateText,
   translateIdentifiers as localTranslateIdentifiers,
 } from '../claude';
+import { getTranslationBackend } from '../translation';
+
+/**
+ * SSE translation event emitter.
+ * The IPC broadcast handler calls `emitTranslationEvent` when it receives
+ * a `translation-event` broadcast from Muninn (forwarded from SSE).
+ * The batch handler awaits `waitForTranslationEvent` instead of polling.
+ */
+const translationEvents = new EventEmitter();
+translationEvents.setMaxListeners(50);
+
+export function emitTranslationEvent(event: any): void {
+  const jobId = event.jobId;
+  if (jobId) {
+    log(`[Intent] SSE event received for job ${jobId}: ${event.type}`);
+    translationEvents.emit(jobId, event);
+  }
+}
 import {
   IntentDecoration,
   GardenerIntentsForFileResponse,
@@ -56,29 +74,7 @@ function detectLanguage(text: string): LanguageCode {
 }
 
 /**
- * Translate text from English to target language using local Claude CLI
- */
-async function translateToTargetLang(
-  _origin: string,
-  text: string,
-  targetLang: LanguageCode
-): Promise<string> {
-  if (!text || targetLang === 'en') {
-    return text;
-  }
-
-  try {
-    // Use local translation via Claude CLI
-    const translations = await localTranslateText([text], 'en', targetLang);
-    return translations[text] || text;
-  } catch (error: any) {
-    log(`[Intent] Translation failed: ${error.message}`);
-    return text;
-  }
-}
-
-/**
- * Translate text between any two languages using local Claude CLI
+ * Translate text between any two languages using the active translation backend
  */
 async function translateBetweenLanguages(
   _origin: string,
@@ -91,8 +87,8 @@ async function translateBetweenLanguages(
   }
 
   try {
-    // Use local translation via Claude CLI
-    const translations = await localTranslateText([text], sourceLang, targetLang);
+    const backend = getTranslationBackend();
+    const translations = await backend.translateText([text], sourceLang, targetLang);
     return translations[text] || text;
   } catch (error: any) {
     log(`[Intent] Translation failed: ${error.message}`);
@@ -339,16 +335,16 @@ export async function handleNormalizeIntent(message: IPCMessage): Promise<Normal
       };
     }
 
-    // Translate to English using local Claude CLI
-    log(`[Intent] Normalizing intent from ${detectedLang} to English locally`);
+    // Translate to English using active translation backend
+    log(`[Intent] Normalizing intent from ${detectedLang} to English`);
 
     // Build list of all texts to translate
     const textsToTranslate: string[] = [title];
     if (description) textsToTranslate.push(description);
     if (constraints.length > 0) textsToTranslate.push(...constraints.filter(Boolean));
 
-    // Use local translation via Claude CLI
-    const translations = await localTranslateText(textsToTranslate, detectedLang as LanguageCode, 'en');
+    const backend = getTranslationBackend();
+    const translations = await backend.translateText(textsToTranslate, detectedLang as LanguageCode, 'en');
 
     const titleEn = translations[title] || title;
     const descriptionEn = description ? (translations[description] || description) : '';
@@ -493,8 +489,9 @@ export async function handleTranslateIntentMetadata(message: IPCMessage): Promis
       };
     }
 
-    // Use local translation via Claude CLI
-    const translations = await localTranslateText(textsToTranslate, sourceLanguage as LanguageCode, targetLang as LanguageCode);
+    // Use active translation backend (API or local Claude CLI)
+    const backend = getTranslationBackend();
+    const translations = await backend.translateText(textsToTranslate, sourceLanguage as LanguageCode, targetLang as LanguageCode);
 
     const translatedTitle = sourceTitle ? (translations[sourceTitle] || sourceTitle) : '';
     const translatedDescription = sourceDescription ? (translations[sourceDescription] || sourceDescription) : '';
@@ -525,6 +522,184 @@ export async function handleTranslateIntentMetadata(message: IPCMessage): Promis
       error: error.message,
     };
   }
+}
+
+/**
+ * Handle batch translate intent metadata request
+ *
+ * Translates multiple intents in a single call, deduplicating texts
+ * to minimize API calls. Only translates intents not already cached.
+ */
+export async function handleTranslateIntentsBatch(message: IPCMessage): Promise<any> {
+  const { intents, targetLang, origin } = message.data;
+
+  if (!intents || !Array.isArray(intents) || intents.length === 0) {
+    return { success: true, results: [] };
+  }
+
+  if (!origin || !targetLang) {
+    return { success: false, results: [], error: 'Missing origin or targetLang' };
+  }
+
+  const cache = intentCacheManager.getCache(origin);
+  const results: any[] = [];
+  const uncachedIntents: Array<{ index: number; intent: any; sourceLang: string }> = [];
+
+  // Phase 1: Resolve from cache, collect uncached
+  for (let i = 0; i < intents.length; i++) {
+    const intent = intents[i];
+    const sourceLang = intent.sourceLang || intent.originalLang || 'en';
+
+    if (sourceLang === targetLang) {
+      results[i] = { intentId: intent.id, title: intent.title, description: intent.description, constraints: intent.constraints || [], cached: true };
+      continue;
+    }
+
+    const cached = cache.getMetadata(intent.id, targetLang);
+    if (cached) {
+      // Invalidate cache if intent was updated after the cache entry was written
+      const intentUpdatedAt = intent.updatedAt ? new Date(intent.updatedAt).getTime() : 0;
+      if (intentUpdatedAt > cached.timestamp) {
+        log(`[Intent] Cache stale for ${intent.id}: intent updated ${intent.updatedAt}, cache from ${new Date(cached.timestamp).toISOString()}`);
+      } else {
+        results[i] = { intentId: intent.id, title: cached.title, description: cached.description, constraints: cached.constraints || intent.constraints || [], cached: true };
+        continue;
+      }
+    }
+
+    uncachedIntents.push({ index: i, intent, sourceLang });
+  }
+
+  log(`[Intent] Batch: ${intents.length} intents, ${intents.length - uncachedIntents.length} cached, ${uncachedIntents.length} to translate`);
+
+  if (uncachedIntents.length === 0) {
+    return { success: true, results };
+  }
+
+  // Phase 2: Send all uncached intents to API as a single batch job
+  const taskId = `intent-translate-${Date.now()}`;
+  const sourceLang = uncachedIntents[0].sourceLang;
+  const intentPayload = uncachedIntents.map(({ intent }) => ({
+    id: intent.id,
+    cloudId: intent.cloudId,
+    title: intent.title || '',
+    description: intent.description || '',
+  }));
+
+  sendProgress(taskId, 'Intent Translation', 'started', {
+    status: 'processing',
+    statusMessage: `Translating ${uncachedIntents.length} intents to ${targetLang}...`,
+  });
+
+  try {
+    const { apiRequest } = await import('../api/client');
+
+    // Queue translation job (single API call for all intents)
+    const response = await apiRequest<{ jobId: string; status: string }>('/translate-intents', {
+      method: 'POST',
+      body: JSON.stringify({ intents: intentPayload, sourceLang, targetLang }),
+    });
+
+    if (!response.success || !response.data?.jobId) {
+      throw new Error(response.error || 'Failed to queue translation job');
+    }
+
+    const jobId = response.data.jobId;
+    log(`[Intent] Translation job queued: ${jobId} for ${uncachedIntents.length} intents`);
+
+    // Wait for SSE completion event — fall back to polling if SSE disconnects
+    await new Promise<void>((resolve, reject) => {
+      let polling = false;
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        translationEvents.removeAllListeners(jobId);
+        translationEvents.removeListener('sse-disconnected', onDisconnect);
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Translation timed out (5 minutes)'));
+      }, 5 * 60 * 1000);
+
+      // SSE disconnect fallback
+      const onDisconnect = async () => {
+        if (polling) return;
+        polling = true;
+        log(`[Intent] SSE disconnected, switching to polling for job ${jobId}`);
+        cleanup();
+        try {
+          const startTime = Date.now();
+          while (Date.now() - startTime < 5 * 60 * 1000) {
+            await new Promise(r => setTimeout(r, 3000));
+            const status = await apiRequest<{ status: string }>(`/translate-status?jobId=${jobId}`, { method: 'GET' });
+            if (status.data?.status === 'completed') { resolve(); return; }
+            if (status.data?.status === 'failed') { reject(new Error('Translation failed')); return; }
+          }
+          reject(new Error('Translation timed out (polling)'));
+        } catch (err) { reject(err); }
+      };
+      translationEvents.on('sse-disconnected', onDisconnect);
+
+      // Primary: SSE events
+      translationEvents.on(jobId, (event: any) => {
+        if (event.type === 'translation:progress') {
+          sendProgress(taskId, 'Intent Translation', 'progress', {
+            status: 'processing',
+            statusMessage: `Translating intents to ${targetLang}...`,
+            progress: event.progress || 50,
+          });
+        }
+        if (event.type === 'translation:complete') {
+          cleanup();
+          resolve();
+        }
+        if (event.type === 'translation:failed') {
+          cleanup();
+          reject(new Error(event.error || 'Translation failed'));
+        }
+      });
+    });
+
+    // Fetch translations from intentTranslations collection (single source of truth)
+    const encodedOrigin = encodeURIComponent(origin);
+    const translationsResponse = await apiRequest<{
+      success: boolean;
+      translations: Record<string, { title: string; description: string }>;
+    }>(`/intent-translations?origin=${encodedOrigin}&lang=${targetLang}`, { method: 'GET' });
+    const intentTranslations = translationsResponse.data?.translations || {};
+
+    // Phase 3: Map translations back to results and cache
+    // intentTranslations is keyed by cloudId, we need to match by cloudId
+    for (const { index, intent } of uncachedIntents) {
+      const tr = intent.cloudId ? intentTranslations[intent.cloudId] : null;
+      const translatedTitle = tr?.title || intent.title;
+      const translatedDescription = tr?.description || intent.description;
+      const constraints = intent.constraints || [];
+
+      cache.setMetadata(intent.id, targetLang, { title: translatedTitle, description: translatedDescription, constraints });
+      results[index] = { intentId: intent.id, title: translatedTitle, description: translatedDescription, constraints, cached: false };
+    }
+
+    sendProgress(taskId, 'Intent Translation', 'complete', {
+      status: 'complete',
+      statusMessage: `Translated ${uncachedIntents.length} intents to ${targetLang}`,
+      autoClose: true,
+      autoCloseDelay: 3000,
+    });
+  } catch (error: any) {
+    log(`[Intent] Batch translation error: ${error.message}`);
+    sendProgress(taskId, 'Intent Translation', 'error', {
+      status: 'error',
+      error: error.message,
+    });
+    for (const { index, intent } of uncachedIntents) {
+      results[index] = { intentId: intent.id, title: intent.title, description: intent.description, constraints: intent.constraints || [], cached: false, error: error.message };
+    }
+  }
+
+  log(`[Intent] Batch complete: translated ${uncachedIntents.length} intents`);
+  return { success: true, results };
 }
 
 /**

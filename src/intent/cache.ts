@@ -13,8 +13,9 @@ import { IntentCacheEntry, IntentMetadataCacheEntry, BlockContentCacheEntry } fr
 /**
  * Cache configuration
  */
-const CACHE_MAX_SIZE = 200;
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_MAX_SIZE = 10000; // Support large projects with thousands of intents
+// No fixed TTL — cache invalidation is driven by intent.updatedAt comparison
+// Entries are only evicted by LRU when cache is full
 
 /**
  * Get cache directory path
@@ -66,13 +67,6 @@ export class IntentTranslationCache {
       return null;
     }
 
-    // Check TTL
-    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-      this.cache.delete(key);
-      this.dirty = true;
-      return null;
-    }
-
     // Move to end (most recently used)
     this.cache.delete(key);
     this.cache.set(key, entry);
@@ -112,13 +106,6 @@ export class IntentTranslationCache {
     const entry = this.cache.get(key);
 
     if (!entry) {
-      return null;
-    }
-
-    // Check TTL
-    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-      this.cache.delete(key);
-      this.dirty = true;
       return null;
     }
 
@@ -195,13 +182,8 @@ export class IntentTranslationCache {
         const data = JSON.parse(content);
 
         if (data && typeof data === 'object') {
-          // Restore cache entries, filtering expired ones
-          const now = Date.now();
           for (const [key, entry] of Object.entries(data)) {
-            const cacheEntry = entry as IntentCacheEntry;
-            if (now - cacheEntry.timestamp < CACHE_TTL_MS) {
-              this.cache.set(key, cacheEntry);
-            }
+            this.cache.set(key, entry as IntentCacheEntry);
           }
           log(`[IntentCache] Loaded ${this.cache.size} entries for ${this.origin}`);
         }

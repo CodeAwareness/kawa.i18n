@@ -38,6 +38,8 @@ import {
   handleGetIntentsForLines,
   handleNormalizeIntent,
   handleTranslateIntentMetadata,
+  handleTranslateIntentsBatch,
+  emitTranslationEvent,
   handleDetectLanguage,
   handleDirectGetIntentsForFile,
   handleDirectGetIntentsForLines,
@@ -368,6 +370,7 @@ async function translateNewTerms(
     const dictLang = sourceLang === 'en' ? targetLang : sourceLang;
 
     const backend = getTranslationBackend();
+    if ('origin' in backend) (backend as any).origin = origin;
     const translations = await backend.translateIdentifiers(terms, sourceLang, targetLang);
 
     const translatedCount = Object.keys(translations).length;
@@ -415,6 +418,7 @@ async function translateNewComments(
 ): Promise<void> {
   try {
     const backend = getTranslationBackend();
+    if ('origin' in backend) (backend as any).origin = origin;
     const translations = await backend.translateComments(comments, sourceLang, targetLang);
     const translatedCount = Object.keys(translations).length;
     log(`Successfully translated ${translatedCount} new comments via ${backend.name} backend`);
@@ -822,9 +826,17 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
       log(`[ScanProject] Extracted ${allMarkdownTexts.length} text blocks from markdown files`);
     }
 
-    const uniqueIdentifiers = Array.from(identifierSet);
+    const allIdentifiers = Array.from(identifierSet);
     // Combine comments and markdown texts for translation (both are natural language)
-    const allTextsToTranslate = [...allComments, ...allMarkdownTexts];
+    const allTexts = [...allComments, ...allMarkdownTexts];
+
+    // Filter out terms and comments already in the dictionary to avoid re-translating
+    const dictLang = targetLang as LanguageCode;
+    const { dictionary: multiLangDict } = await dictionaryManager.loadMultiLang(origin, 'en' as LanguageCode, dictLang);
+    const uniqueIdentifiers = allIdentifiers.filter(term => !multiLangDict.hasTerm(term));
+    const allTextsToTranslate = allTexts.filter(text => !multiLangDict.getCommentTranslation(text, dictLang));
+
+    log(`[ScanProject] Filtered: ${allIdentifiers.length} → ${uniqueIdentifiers.length} new identifiers, ${allTexts.length} → ${allTextsToTranslate.length} new texts`);
 
     // Calculate total characters for token estimation
     // Identifiers: each identifier name
@@ -985,6 +997,7 @@ async function handleScanProject(message: IPCMessage): Promise<any> {
     };
 
     const scanBackend = getTranslationBackend();
+    if ('origin' in scanBackend) (scanBackend as any).origin = origin;
     const translateResult = await scanBackend.translateProject(
       uniqueIdentifiers,
       allTextsToTranslate,
@@ -1115,6 +1128,7 @@ async function handleProceedTranslation(message: IPCMessage): Promise<any> {
     };
 
     const proceedBackend = getTranslationBackend();
+    if ('origin' in proceedBackend) (proceedBackend as any).origin = origin;
     const translateResult = await proceedBackend.translateProject(
       pending.identifiers,
       pending.comments,
@@ -1291,6 +1305,7 @@ async function handleFileSaved(message: IPCMessage): Promise<any> {
 
       try {
         const fileSaveBackend = getTranslationBackend();
+        if ('origin' in fileSaveBackend) (fileSaveBackend as any).origin = origin;
         const translations = await fileSaveBackend.translateIdentifiers(newTermsToTranslate, sourceLang, targetLang);
 
         log(`[FileSave] Successfully translated ${Object.keys(translations).length} new terms via ${fileSaveBackend.name} backend`);
@@ -1874,6 +1889,14 @@ async function main() {
   // These use the i18n domain to bypass Gardener's intent handling
   registerHandler('i18n', 'normalize-intent', handleNormalizeIntent);
   registerHandler('i18n', 'translate-intent-metadata', handleTranslateIntentMetadata);
+  registerHandler('i18n', 'translate-intents-batch', handleTranslateIntentsBatch);
+  registerHandler('i18n', 'translation-event', async (msg: IPCMessage) => {
+    // Forward SSE event to both intent and code translation listeners
+    emitTranslationEvent(msg.data);
+    const { emitCodeTranslationEvent } = await import('./translation/api-backend');
+    emitCodeTranslationEvent(msg.data);
+    return { success: true };
+  });
   registerHandler('i18n', 'detect-language', handleDetectLanguage);
 
   // Register intent handlers (for Kawa Code routing - legacy, may be intercepted by Gardener)
