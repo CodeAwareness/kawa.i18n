@@ -14,7 +14,7 @@
 import fetch, { RequestInit as NodeRequestInit } from 'node-fetch';
 import crypto from 'crypto';
 import { Dictionary, LanguageCode } from '../core/types';
-import { getAccessToken } from '../auth/store';
+import { getAccessToken, refreshToken } from '../auth/store';
 
 const API_BASE_URL = process.env.KAWA_API_URL || 'https://api.kawacode.ai';
 
@@ -59,11 +59,13 @@ function getAuthToken(): string | null {
 
 /**
  * Make authenticated API request
- * Automatically prepends /v1/i18n to all endpoints
+ * Automatically prepends /v1/i18n to all endpoints.
+ * On 401, requests fresh tokens from Kawa Code and retries once.
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: NodeRequestInit = {}
+  options: NodeRequestInit = {},
+  _retried = false,
 ): Promise<APIResponse<T>> {
   const token = getAuthToken();
 
@@ -86,6 +88,14 @@ export async function apiRequest<T>(
     } as NodeRequestInit);
 
     if (!response.ok) {
+      // On 401, re-request tokens from Kawa Code and retry once
+      if (response.status === 401 && !_retried) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          return apiRequest<T>(endpoint, options, true);
+        }
+      }
+
       const errorText = await response.text();
       return {
         success: false,

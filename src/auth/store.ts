@@ -75,6 +75,26 @@ export function isAuthenticated(): boolean {
 }
 
 /**
+ * Token refresh callback — set by index.ts to request fresh tokens from Kawa Code.
+ * Used by apiRequest to automatically retry on 401 without circular dependencies.
+ */
+let refreshTokenCallback: (() => Promise<void>) | null = null;
+
+export function setRefreshTokenCallback(cb: () => Promise<void>): void {
+  refreshTokenCallback = cb;
+}
+
+export async function refreshToken(): Promise<boolean> {
+  if (!refreshTokenCallback) return false;
+  try {
+    await refreshTokenCallback();
+    return isAuthenticated();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Clear auth state (on logout)
  */
 export function clearAuthState(): void {
