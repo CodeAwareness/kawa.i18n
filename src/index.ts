@@ -32,7 +32,7 @@ import { IPCMessage } from './ipc/protocol';
 import { LanguageCode, TranslationScope } from './core/types';
 import type { TranslationProgressCallback } from './claude';
 import { getTranslationBackend, resetTranslationBackend } from './translation';
-import { setAuthState } from './auth/store';
+import { setAuthState, setRefreshTokenCallback } from './auth/store';
 import {
   handleGetIntentsForFile,
   handleGetIntentsForLines,
@@ -1863,6 +1863,9 @@ async function main() {
   // STDIN HANDLERS (Kawa Code communication)
   // -------------------------------------------------------------------------
 
+  // Register token refresh callback so apiRequest can re-request tokens on 401
+  setRefreshTokenCallback(requestAuthFromKawaCode);
+
   // Register response interceptor to handle our own Kawa Code requests
   addResponseInterceptor(handleKawaCodeResponse);
 
@@ -1892,6 +1895,7 @@ async function main() {
   registerHandler('i18n', 'translate-intents-batch', handleTranslateIntentsBatch);
   registerHandler('i18n', 'translation-event', async (msg: IPCMessage) => {
     // Forward SSE event to both intent and code translation listeners
+    log(`[SSE-DEBUG] translation-event received: type=${msg.data?.type}, jobId=${msg.data?.jobId}, subtype=${msg.data?.subtype}`);
     emitTranslationEvent(msg.data);
     const { emitCodeTranslationEvent } = await import('./translation/api-backend');
     emitCodeTranslationEvent(msg.data);
