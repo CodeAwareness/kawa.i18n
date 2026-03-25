@@ -65,23 +65,19 @@ async function dispatchMessage(message: IPCMessage): Promise<void> {
   }
 
   const key = `${message.domain}:${message.action}`;
-
-  log(`Parsed message - flow: ${message.flow}, domain: ${message.domain}, action: ${message.action}, _msgId: ${message._msgId || 'none'}`);
-
   const handler = handlers.get(key);
   if (!handler) {
-    // For broadcast messages, no handler is not an error (just ignore)
-    if (message.flow === 'brdc') {
-      log(`No handler for broadcast: ${key} (ignoring)`);
-      return;
+    // Only warn for request messages addressed to domains we subscribe to;
+    // silently ignore everything else (broadcasts, responses, errors, and
+    // messages for domains this extension doesn't handle).
+    if (message.flow === 'req') {
+      log(`No handler for request: ${key}`);
+      sendError(message, `No handler registered for ${key}`);
     }
-
-    log(`No handler for: ${key} (available: ${Array.from(handlers.keys()).join(', ')})`);
-    sendError(message, `No handler registered for ${key}`);
     return;
   }
 
-  log(`Executing handler for: ${key}`);
+  log(`Dispatching ${message.flow} ${key}`);
 
   // Execute handler
   const result = await handler(message);
